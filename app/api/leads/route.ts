@@ -1,0 +1,104 @@
+import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { hasValidSession, isValidSessionToken, SESSION_COOKIE_NAME } from "@/lib/auth";
+import { createServiceClient } from "@/lib/supabase/server";
+import { STATUS_ORDER } from "@/lib/types";
+
+export async function GET() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+
+  if (!isValidSessionToken(token)) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const supabase = createServiceClient();
+  const { data, error } = await supabase
+    .from("leads")
+    .select("*")
+    .is("merged_into_lead_id", null)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ leads: data });
+}
+
+/** Cadastro manual de lead (ex: contato recebido por telefone, indicação,
+ * ou qualquer canal fora do Meta Ads / prospecção). */
+export async function POST(request: NextRequest) {
+  if (!(await hasValidSession())) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const body = await request.json().catch(() => ({}));
+  const { full_name, phone, email, city, category, notes, status, monthly_value } = body as {
+    full_name?: string;
+    phone?: string;
+    email?: string;
+    city?: string;
+    category?: string;
+    notes?: string;
+    status?: string;
+    monthly_value?: number | null;
+  };
+
+  const name = (full_name ?? "").trim();
+  const phoneTrimmed = (phone ?? "").trim();
+  const emailTrimmed = (email ?? "").trim();
+
+  if (!name) {
+    return NextResponse.json({ error: "Nome é obrigatório" }, { status: 400 });
+  }
+  if (!phoneTrimmed && !emailTrimmed) {
+    return NextResponse.json(
+      { error: "Informe pelo menos telefone ou e-mail" },
+      { status: 400 }
+    );
+  }
+  if (status !== undefined && !STATUS_ORDER.includes(status as (typeof STATUS_ORDER)[number])) {
+    return NextResponse.json({ error: "status inválido" }, { status: 400 });
+  }
+  if (
+    monthly_value !== undefined &&
+    monthly_value !== null &&
+    (typeof monthly_value !== "number" || Number.isNaN(monthly_value) || monthly_value < 0)
+  ) {
+    return NextResponse.json({ error: "monthly_value inválido" }, { status: 400 });
+  }
+
+  const supabase = createServiceClient();
+
+  const { data, error } = await supabase
+    .from("leads")
+    .insert({
+      full_name: name,
+      phone: phoneTrimmed || null,
+      email: emailTrimmed || null,
+      city: city?.trim() || null,
+      category: category?.trim() || null,
+      status: status ?? "novo_lead",
+      source: "manual",
+      notes: notes?.trim() || null,
+      monthly_value: monthly_value ?? null,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  const { error: eventError } = await supabase.from("lead_events").insert({
+    lead_id: data.id,
+    type: "created",
+    message: "Lead cadastrado manualmente",
+  });
+  if (eventError) {
+    console.error("Erro ao registrar histórico do lead:", eventError.message);
+  }
+
+  return NextResponse.json({ lead: data }, { status: 201 });
+}
