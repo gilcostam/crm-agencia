@@ -264,3 +264,11 @@ alter table public.clients
   add column if not exists contract_end_date date;
 
 create index if not exists clients_contract_end_date_idx on public.clients (contract_end_date);
+
+-- Timestamp de quando a tarefa foi marcada como concluída — preenchido pelo
+-- PATCH em app/api/clients/[id]/tasks/[taskId]/route.ts sempre que `status`
+-- vira 'concluida' (e limpo se sair de novo). Alimenta a "Linha do tempo de
+-- execução" no painel completo de tarefas do cliente (ver
+-- app/dashboard/clientes/ClientTasksPanel.tsx).
+alter table public.client_tasks
+  add column if not exists completed_at timestamptz;

@@ -55,6 +55,10 @@ export async function PATCH(
       return NextResponse.json({ error: "Status inválido" }, { status: 400 });
     }
     update.status = status;
+    // Registra quando a tarefa foi concluída (alimenta a linha do tempo de
+    // execução no painel do cliente) e limpa se ela sair de 'concluida' de
+    // novo (ex.: usuário desmarcou o checkbox por engano).
+    update.completed_at = status === "concluida" ? new Date().toISOString() : null;
   }
 
   if (Object.keys(update).length === 0) {

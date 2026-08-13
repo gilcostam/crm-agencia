@@ -186,6 +186,11 @@ export interface ClientTask {
   recurrence: TaskRecurrence | null;
   status: TaskStatus;
   source_document: string | null;
+  /** Preenchido automaticamente quando `status` vira 'concluida' (e limpo se
+   * o status sair de 'concluida' de novo) — ver PATCH em
+   * app/api/clients/[id]/tasks/[taskId]/route.ts. Usado pra montar a linha
+   * do tempo de execução no painel de tarefas do cliente. */
+  completed_at: string | null;
   created_at: string;
   updated_at: string;
   /** Presente quando a API já faz o join com o cliente (listagem global). */

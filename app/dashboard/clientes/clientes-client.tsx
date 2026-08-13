@@ -663,7 +663,7 @@ function ClientDetailModal({ client, onClose, onSaveField, onFullEdit }: ClientD
           )}
         </div>
 
-        <ClientTasksPanel clientId={client.id} />
+        <ClientTasksPanel clientId={client.id} clientName={client.full_name} />
       </div>
 
       {editingFull && (
