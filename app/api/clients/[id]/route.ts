@@ -82,13 +82,18 @@ export async function PATCH(
     }
     update.full_name = name;
   }
-  if (email !== undefined) update.email = email.trim() || null;
-  if (phone !== undefined) update.phone = phone.trim() || null;
-  if (document !== undefined) update.document = document.trim() || null;
+  // Usa `?.trim()` (não `.trim()`) porque o formulário de edição completa
+  // envia `null` explícito (não `undefined`) para campos em branco — ver
+  // handleFullUpdate em app/dashboard/clientes/clientes-client.tsx. Chamar
+  // `.trim()` direto num valor `null` derruba a rota com 500 sem corpo
+  // (TypeError não tratado, antes de chegar no try/catch do Supabase).
+  if (email !== undefined) update.email = email?.trim() || null;
+  if (phone !== undefined) update.phone = phone?.trim() || null;
+  if (document !== undefined) update.document = document?.trim() || null;
   if (category !== undefined) update.category = category?.trim() || null;
-  if (city !== undefined) update.city = city.trim() || null;
+  if (city !== undefined) update.city = city?.trim() || null;
   if (status !== undefined) update.status = status;
-  if (notes !== undefined) update.notes = notes.trim() || null;
+  if (notes !== undefined) update.notes = notes?.trim() || null;
   if (monthly_value !== undefined) {
     const parsed =
       monthly_value !== null && String(monthly_value).trim() !== "" ? Number(monthly_value) : null;
