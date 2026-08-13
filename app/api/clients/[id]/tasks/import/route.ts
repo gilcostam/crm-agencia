@@ -1,9 +1,61 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PDFParse } from "pdf-parse";
 import { hasValidSession } from "@/lib/auth";
 import { parseGbpReportTasks } from "@/lib/gbpTaskParser";
 
 const MAX_SIZE = 15 * 1024 * 1024; // 15MB
+
+/**
+ * pdf-parse (via pdfjs-dist "legacy" build) tenta polyfillar DOMMatrix/
+ * ImageData/Path2D usando o pacote nativo opcional @napi-rs/canvas. Esse
+ * pacote é específico de plataforma (binário nativo) e nem sempre chega
+ * corretamente no bundle de function do Vercel (build roda em Linux, o
+ * binário resolvido localmente pode ser de outra plataforma) — quando ele
+ * falha ao carregar, o pdfjs-dist segue em frente sem avisar de forma
+ * fatal, mas código interno que faz `class X extends DOMMatrix` quebra na
+ * avaliação do módulo com "ReferenceError: DOMMatrix is not defined".
+ *
+ * Como só usamos extração de texto (getText()), nunca renderização, não
+ * precisamos de um canvas real — só que os globais existam como
+ * construtores válidos. Por isso: (1) definimos stubs mínimos ANTES de
+ * importar o pacote, e (2) usamos import() dinâmico, já que um `import`
+ * estático no topo do arquivo seria avaliado antes de qualquer código
+ * nosso rodar, tornando os stubs inúteis.
+ */
+async function loadPdfParse() {
+  const g = globalThis as unknown as Record<string, unknown>;
+  if (typeof g.DOMMatrix === "undefined") {
+    g.DOMMatrix = class DOMMatrix {};
+  }
+  if (typeof g.ImageData === "undefined") {
+    g.ImageData = class ImageData {};
+  }
+  if (typeof g.Path2D === "undefined") {
+    g.Path2D = class Path2D {};
+  }
+  /**
+   * pdfjs-dist roda em modo "fake worker" no Node (não há Web Worker de
+   * verdade) e, por padrão, tenta carregar o script do worker via um
+   * import() dinâmico com caminho relativo ("./pdf.worker.mjs") resolvido a
+   * partir do próprio chunk bundlado do pacote — chunk esse que não tem
+   * esse arquivo do lado (Turbopack empacota cada módulo em um chunk
+   * próprio). Isso derruba a extração com "Setting up fake worker failed:
+   * Cannot find module .../pdf.worker.mjs".
+   *
+   * Import explícito do módulo do worker aqui, registrado em
+   * `globalThis.pdfjsWorker`, faz o pdfjs-dist pular esse carregamento
+   * dinâmico frágil (ele primeiro checa `globalThis.pdfjsWorker
+   * ?.WorkerMessageHandler` antes de tentar resolver `workerSrc`) — ver
+   * `PDFWorker.#mainThreadWorkerMessageHandler` em pdfjs-dist. Como aqui é
+   * um import estático de um subpath real do pacote, o bundler consegue
+   * rastrear e incluir o arquivo tanto em dev quanto no build de produção.
+   */
+  if (typeof g.pdfjsWorker === "undefined") {
+    g.pdfjsWorker = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
+  }
+
+  const mod = await import("pdf-parse");
+  return mod.PDFParse;
+}
 
 /**
  * Extrai o texto de um PDF enviado (ex.: relatório de Perfil de Empresa no
@@ -45,6 +97,7 @@ export async function POST(
 
   let text: string;
   try {
+    const PDFParse = await loadPdfParse();
     const arrayBuffer = await file.arrayBuffer();
     const parser = new PDFParse({ data: new Uint8Array(arrayBuffer) });
     try {

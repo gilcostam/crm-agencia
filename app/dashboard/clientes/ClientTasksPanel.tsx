@@ -119,20 +119,30 @@ export default function ClientTasksPanel({ clientId }: { clientId: string }) {
     formData.append("file", file);
     formData.append("anchor_date", anchorDate);
 
-    const res = await fetch(`/api/clients/${clientId}/tasks/import`, {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json();
-    setImporting(false);
-    if (!res.ok) {
-      setImportError(data.error ?? "Erro ao ler o documento");
-      return;
+    try {
+      const res = await fetch(`/api/clients/${clientId}/tasks/import`, {
+        method: "POST",
+        body: formData,
+      });
+      // A resposta pode não ser JSON válido em caso de erro inesperado do
+      // servidor (ex.: crash antes de conseguir montar um NextResponse.json) —
+      // sem isso, res.json() lança e o catch abaixo nunca chega a rodar
+      // setImporting(false), deixando o botão travado em "Lendo PDF..." pra
+      // sempre.
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data) {
+        setImportError(data?.error ?? "Erro ao ler o documento. Tente novamente.");
+        return;
+      }
+      if (data.warning) setImportWarning(data.warning);
+      setPreview(data.tasks ?? []);
+      setSourceDocument(data.source_document ?? file.name);
+    } catch {
+      setImportError("Erro de conexão ao enviar o documento. Tente novamente.");
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
-    if (data.warning) setImportWarning(data.warning);
-    setPreview(data.tasks ?? []);
-    setSourceDocument(data.source_document ?? file.name);
-    if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
   function updatePreviewTask(index: number, patch: Partial<ParsedClientTask>) {
