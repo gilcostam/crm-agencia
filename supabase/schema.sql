@@ -252,3 +252,15 @@ create trigger client_tasks_set_updated_at
   for each row execute function public.set_updated_at();
 
 alter table public.client_tasks enable row level security;
+
+-- Período de vigência do contrato do cliente — usado pra alertar na UI
+-- quando um contrato está perto de vencer ou já venceu (ver
+-- app/dashboard/clientes/clientes-client.tsx). Fica no fim do arquivo, como
+-- converted_to_client_id acima, pra não mexer na definição original da
+-- tabela.
+alter table public.clients
+  add column if not exists contract_start_date date;
+alter table public.clients
+  add column if not exists contract_end_date date;
+
+create index if not exists clients_contract_end_date_idx on public.clients (contract_end_date);

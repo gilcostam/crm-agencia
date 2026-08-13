@@ -38,6 +38,8 @@ export async function POST(request: NextRequest) {
     status,
     notes,
     source_lead_id,
+    contract_start_date,
+    contract_end_date,
   } = body as {
     full_name?: string;
     email?: string;
@@ -49,6 +51,8 @@ export async function POST(request: NextRequest) {
     status?: ClientStatus;
     notes?: string;
     source_lead_id?: string;
+    contract_start_date?: string | null;
+    contract_end_date?: string | null;
   };
 
   const name = (full_name ?? "").trim();
@@ -76,6 +80,8 @@ export async function POST(request: NextRequest) {
       status: status ?? "ativo",
       notes: notes?.trim() || null,
       source_lead_id: source_lead_id || null,
+      contract_start_date: contract_start_date?.trim() || null,
+      contract_end_date: contract_end_date?.trim() || null,
     })
     .select()
     .single();

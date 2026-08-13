@@ -57,6 +57,8 @@ export async function PATCH(
     monthly_value,
     status,
     notes,
+    contract_start_date,
+    contract_end_date,
   } = body as {
     full_name?: string;
     email?: string;
@@ -67,6 +69,8 @@ export async function PATCH(
     monthly_value?: number | string | null;
     status?: ClientStatus;
     notes?: string;
+    contract_start_date?: string | null;
+    contract_end_date?: string | null;
   };
 
   const update: Record<string, unknown> = {};
@@ -89,6 +93,12 @@ export async function PATCH(
     const parsed =
       monthly_value !== null && String(monthly_value).trim() !== "" ? Number(monthly_value) : null;
     update.monthly_value = parsed !== null && !Number.isNaN(parsed) ? parsed : null;
+  }
+  if (contract_start_date !== undefined) {
+    update.contract_start_date = contract_start_date?.trim() || null;
+  }
+  if (contract_end_date !== undefined) {
+    update.contract_end_date = contract_end_date?.trim() || null;
   }
 
   if (Object.keys(update).length === 0) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ClientTask,
   ParsedClientTask,
@@ -32,6 +32,67 @@ const EMPTY_MANUAL_TASK = {
   recurrence: "" as TaskRecurrence | "",
 };
 
+interface TaskStats {
+  total: number;
+  done: number;
+  overdue: number;
+  upcoming: number;
+  percent: number;
+}
+
+function computeTaskStats(tasks: ClientTask[]): TaskStats {
+  // Tarefas canceladas saem do denominador — não representam trabalho
+  // planejado que ainda precisa (ou precisava) ser feito.
+  const relevant = tasks.filter((t) => t.status !== "cancelada");
+  const total = relevant.length;
+  const done = relevant.filter((t) => t.status === "concluida").length;
+  const today = todayISO();
+  const overdue = relevant.filter(
+    (t) => t.status !== "concluida" && t.due_date !== null && t.due_date < today
+  ).length;
+  const upcoming = total - done - overdue;
+  const percent = total > 0 ? Math.round((done / total) * 100) : 0;
+  return { total, done, overdue, upcoming, percent };
+}
+
+/** Barra de progresso gráfica com segmentos empilhados: concluídas (verde),
+ * atrasadas (vermelho) e em dia/sem prazo (cinza) — dá pra ver de relance se
+ * a rotina de trabalho do cliente está em dia ou atrasada. */
+function TaskProgressBar({ stats }: { stats: TaskStats }) {
+  if (stats.total === 0) return null;
+  const donePct = (stats.done / stats.total) * 100;
+  const overduePct = (stats.overdue / stats.total) * 100;
+  const upcomingPct = (stats.upcoming / stats.total) * 100;
+
+  return (
+    <div className="mb-3 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs">
+        <span className="font-medium text-neutral-700">
+          {stats.done}/{stats.total} tarefas concluídas ({stats.percent}%)
+        </span>
+        {stats.overdue > 0 ? (
+          <span className="font-medium text-red-600">
+            {stats.overdue} atrasada{stats.overdue > 1 ? "s" : ""}
+          </span>
+        ) : (
+          <span className="font-medium text-emerald-600">Em dia</span>
+        )}
+      </div>
+      <div className="flex h-2 w-full overflow-hidden rounded-full bg-neutral-200">
+        {donePct > 0 && (
+          <div className="h-full bg-emerald-500" style={{ width: `${donePct}%` }} title="Concluídas" />
+        )}
+        {overduePct > 0 && (
+          <div className="h-full bg-red-500" style={{ width: `${overduePct}%` }} title="Atrasadas" />
+        )}
+        {upcomingPct > 0 && (
+          <div className="h-full bg-neutral-400" style={{ width: `${upcomingPct}%` }} title="Em dia / sem prazo" />
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function ClientTasksPanel({ clientId }: { clientId: string }) {
   const [tasks, setTasks] = useState<ClientTask[] | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -46,6 +107,8 @@ export default function ClientTasksPanel({ clientId }: { clientId: string }) {
   const [anchorDate, setAnchorDate] = useState(todayISO());
   const [confirming, setConfirming] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const stats = useMemo(() => computeTaskStats(tasks ?? []), [tasks]);
 
   useEffect(() => {
     let cancelled = false;
@@ -175,6 +238,8 @@ export default function ClientTasksPanel({ clientId }: { clientId: string }) {
 
   return (
     <div className="mt-5 border-t border-neutral-200 pt-4">
+      <TaskProgressBar stats={stats} />
+
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Rotina de trabalho</p>
         <div className="flex items-center gap-2">
@@ -409,7 +474,15 @@ export default function ClientTasksPanel({ clientId }: { clientId: string }) {
                     {t.responsible && <span>{t.responsible}</span>}
                   </p>
                 </div>
-                <span className="shrink-0 text-xs text-neutral-400">{formatDate(t.due_date)}</span>
+                <span
+                  className={`shrink-0 text-xs ${
+                    t.status !== "concluida" && t.due_date !== null && t.due_date < todayISO()
+                      ? "font-medium text-red-600"
+                      : "text-neutral-400"
+                  }`}
+                >
+                  {formatDate(t.due_date)}
+                </span>
                 <button
                   type="button"
                   onClick={() => deleteTask(t)}

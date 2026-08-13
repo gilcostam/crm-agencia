@@ -106,8 +106,35 @@ export interface Client {
   status: ClientStatus;
   notes: string | null;
   source_lead_id: string | null;
+  /** Início da vigência do contrato (yyyy-mm-dd). */
+  contract_start_date: string | null;
+  /** Fim da vigência do contrato (yyyy-mm-dd) — usado pra alertar quando o
+   * contrato está perto de vencer (ver CONTRACT_WARNING_DAYS). */
+  contract_end_date: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** Quantos dias antes do fim do contrato o alerta de renovação passa a
+ * aparecer na UI. */
+export const CONTRACT_WARNING_DAYS = 30;
+
+export type ContractUrgency = "expired" | "warning" | "ok" | "unknown";
+
+/** Classifica a vigência do contrato pra exibição (badge/alerta) na UI.
+ * `today` deve ser uma string "yyyy-mm-dd" (mesmo formato das colunas date
+ * do Postgres) pra comparação lexicográfica direta, sem fuso-horário. */
+export function contractUrgency(
+  contractEndDate: string | null,
+  todayISODate: string
+): ContractUrgency {
+  if (!contractEndDate) return "unknown";
+  if (contractEndDate < todayISODate) return "expired";
+  const warningDate = new Date(`${todayISODate}T00:00:00`);
+  warningDate.setDate(warningDate.getDate() + CONTRACT_WARNING_DAYS);
+  const warningISODate = `${warningDate.getFullYear()}-${String(warningDate.getMonth() + 1).padStart(2, "0")}-${String(warningDate.getDate()).padStart(2, "0")}`;
+  if (contractEndDate <= warningISODate) return "warning";
+  return "ok";
 }
 
 export interface ClientAttachment {

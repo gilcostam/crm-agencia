@@ -2,12 +2,76 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Client, CLIENT_STATUS_LABELS, ClientStatus, Proposal } from "@/lib/types";
+import {
+  Client,
+  CLIENT_STATUS_LABELS,
+  ClientStatus,
+  CONTRACT_WARNING_DAYS,
+  contractUrgency,
+  ContractUrgency,
+  Proposal,
+} from "@/lib/types";
 import { sanitizePhone } from "@/lib/phone";
 import ClientTasksPanel from "./ClientTasksPanel";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("pt-BR");
+}
+
+/** Formata uma coluna "date" pura (yyyy-mm-dd) sem risco de "voltar um dia"
+ * perto da meia-noite por causa de fuso-horário (mesmo cuidado usado em
+ * ClientTasksPanel para due_date). */
+function formatDateOnly(iso: string | null): string {
+  if (!iso) return "—";
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("pt-BR");
+}
+
+function todayISODate(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function daysUntil(iso: string, todayISO: string): number {
+  const [y, m, d] = iso.split("-").map(Number);
+  const [ty, tm, td] = todayISO.split("-").map(Number);
+  const end = new Date(y, m - 1, d);
+  const today = new Date(ty, tm - 1, td);
+  return Math.round((end.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+const CONTRACT_URGENCY_BADGE: Record<Exclude<ContractUrgency, "unknown">, string> = {
+  expired: "bg-red-100 text-red-700",
+  warning: "bg-amber-100 text-amber-700",
+  ok: "bg-neutral-100 text-neutral-500",
+};
+
+function ContractBadge({ endDate, today }: { endDate: string | null; today: string }) {
+  const urgency = contractUrgency(endDate, today);
+  if (urgency === "unknown" || !endDate) return <span className="text-neutral-400">—</span>;
+  const diff = daysUntil(endDate, today);
+  let label: string;
+  if (urgency === "expired") {
+    label = diff === -1 ? "Vencido há 1 dia" : `Vencido há ${Math.abs(diff)} dias`;
+  } else if (diff === 0) {
+    label = "Vence hoje";
+  } else if (diff === 1) {
+    label = "Vence amanhã";
+  } else {
+    label = `Vence em ${diff} dias`;
+  }
+  return (
+    <span className="inline-flex flex-col gap-0.5">
+      <span className="text-neutral-500">{formatDateOnly(endDate)}</span>
+      {urgency !== "ok" && (
+        <span
+          className={`w-fit rounded px-1.5 py-0.5 text-[10px] font-medium ${CONTRACT_URGENCY_BADGE[urgency]}`}
+        >
+          {label}
+        </span>
+      )}
+    </span>
+  );
 }
 
 function formatCurrency(value: number | null | undefined): string {
@@ -33,6 +97,8 @@ interface ClientFormValues {
   monthly_value: string;
   status: ClientStatus;
   notes: string;
+  contract_start_date: string;
+  contract_end_date: string;
 }
 
 const EMPTY_FORM: ClientFormValues = {
@@ -45,6 +111,8 @@ const EMPTY_FORM: ClientFormValues = {
   monthly_value: "",
   status: "ativo",
   notes: "",
+  contract_start_date: "",
+  contract_end_date: "",
 };
 
 function ClientModal({
@@ -68,6 +136,8 @@ function ClientModal({
           monthly_value: initial.monthly_value !== null ? String(initial.monthly_value) : "",
           status: initial.status,
           notes: initial.notes ?? "",
+          contract_start_date: initial.contract_start_date ?? "",
+          contract_end_date: initial.contract_end_date ?? "",
         }
       : EMPTY_FORM
   );
@@ -228,6 +298,30 @@ function ClientModal({
               </select>
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-neutral-500">
+                Início do contrato
+              </label>
+              <input
+                type="date"
+                value={values.contract_start_date}
+                onChange={(e) => set("contract_start_date", e.target.value)}
+                className="w-full rounded border border-neutral-200 bg-white px-2 py-1.5 text-sm text-neutral-700"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-neutral-500">
+                Fim do contrato
+              </label>
+              <input
+                type="date"
+                value={values.contract_end_date}
+                onChange={(e) => set("contract_end_date", e.target.value)}
+                className="w-full rounded border border-neutral-200 bg-white px-2 py-1.5 text-sm text-neutral-700"
+              />
+            </div>
+          </div>
           <div>
             <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-neutral-500">
               Observações
@@ -268,10 +362,12 @@ interface ClientDetailModalProps {
   client: Client;
   onClose: () => void;
   onSaveField: (id: string, patch: Partial<Client>) => Promise<string | null>;
+  onFullEdit: (id: string, values: ClientFormValues) => Promise<string | null>;
 }
 
-function ClientDetailModal({ client, onClose, onSaveField }: ClientDetailModalProps) {
+function ClientDetailModal({ client, onClose, onSaveField, onFullEdit }: ClientDetailModalProps) {
   const [proposals, setProposals] = useState<Proposal[] | null>(null);
+  const [editingFull, setEditingFull] = useState(false);
   const [notes, setNotes] = useState(client.notes ?? "");
   const [document, setDocumentValue] = useState(client.document ?? "");
   const [category, setCategory] = useState(client.category ?? "");
@@ -329,16 +425,49 @@ function ClientDetailModal({ client, onClose, onSaveField }: ClientDetailModalPr
         className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-4 flex items-start justify-between">
+        <div className="mb-4 flex items-start justify-between gap-3">
           <h3 className="font-serif text-xl text-neutral-900">{client.full_name}</h3>
-          <button
-            onClick={onClose}
-            className="text-lg leading-none text-neutral-400 hover:text-neutral-900"
-            aria-label="Fechar"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setEditingFull(true)}
+              className="rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-100"
+            >
+              Editar dados
+            </button>
+            <button
+              onClick={onClose}
+              className="text-lg leading-none text-neutral-400 hover:text-neutral-900"
+              aria-label="Fechar"
+            >
+              ✕
+            </button>
+          </div>
         </div>
+
+        {(() => {
+          const today = todayISODate();
+          const urgency = contractUrgency(client.contract_end_date, today);
+          if (urgency !== "warning" && urgency !== "expired") return null;
+          const diff = client.contract_end_date ? daysUntil(client.contract_end_date, today) : 0;
+          const message =
+            urgency === "expired"
+              ? `Contrato vencido há ${Math.abs(diff)} dia(s) (${formatDateOnly(client.contract_end_date)}). Considere renovar ou atualizar o status do cliente.`
+              : diff === 0
+                ? `Contrato vence hoje (${formatDateOnly(client.contract_end_date)}).`
+                : `Contrato vence em ${diff} dia(s) (${formatDateOnly(client.contract_end_date)}). Hora de conversar sobre a renovação.`;
+          return (
+            <div
+              className={`mb-4 rounded-md border px-3 py-2 text-xs font-medium ${
+                urgency === "expired"
+                  ? "border-red-200 bg-red-50 text-red-700"
+                  : "border-amber-200 bg-amber-50 text-amber-700"
+              }`}
+            >
+              ⚠️ {message}
+            </div>
+          );
+        })()}
 
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div>
@@ -360,6 +489,14 @@ function ClientDetailModal({ client, onClose, onSaveField }: ClientDetailModalPr
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">E-mail</p>
             <p className="text-neutral-800">{client.email ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Início do contrato</p>
+            <p className="text-neutral-800">{formatDateOnly(client.contract_start_date)}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-neutral-400">Fim do contrato</p>
+            <p className="text-neutral-800">{formatDateOnly(client.contract_end_date)}</p>
           </div>
         </div>
 
@@ -528,6 +665,20 @@ function ClientDetailModal({ client, onClose, onSaveField }: ClientDetailModalPr
 
         <ClientTasksPanel clientId={client.id} />
       </div>
+
+      {editingFull && (
+        // stopPropagation aqui evita que um clique no backdrop do
+        // ClientModal (que já fecha só o modal de edição via seu próprio
+        // onClose) borbulhe até o backdrop deste modal de detalhe e feche
+        // os dois de uma vez.
+        <div onClick={(e) => e.stopPropagation()}>
+          <ClientModal
+            initial={client}
+            onClose={() => setEditingFull(false)}
+            onSave={(values) => onFullEdit(client.id, values)}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -556,6 +707,15 @@ export default function ClientesClient({
     });
   }, [clients, search, statusFilter]);
 
+  const expiringContracts = useMemo(() => {
+    const today = todayISODate();
+    return clients
+      .filter((c) => c.status === "ativo")
+      .map((c) => ({ client: c, urgency: contractUrgency(c.contract_end_date, today) }))
+      .filter((x) => x.urgency === "expired" || x.urgency === "warning")
+      .sort((a, b) => (a.client.contract_end_date ?? "").localeCompare(b.client.contract_end_date ?? ""));
+  }, [clients]);
+
   async function handleCreate(values: ClientFormValues): Promise<string | null> {
     const parsedValue = values.monthly_value.trim() ? Number(values.monthly_value) : null;
     const res = await fetch("/api/clients", {
@@ -572,6 +732,23 @@ export default function ClientesClient({
       [...prev, data.client].sort((a, b) => a.full_name.localeCompare(b.full_name))
     );
     return null;
+  }
+
+  async function handleFullUpdate(id: string, values: ClientFormValues): Promise<string | null> {
+    const parsedValue = values.monthly_value.trim() ? Number(values.monthly_value) : null;
+    return handleSaveField(id, {
+      full_name: values.full_name.trim(),
+      email: values.email.trim() || null,
+      phone: values.phone.trim() || null,
+      document: values.document.trim() || null,
+      category: values.category.trim() || null,
+      city: values.city.trim() || null,
+      monthly_value: parsedValue !== null && !Number.isNaN(parsedValue) ? parsedValue : null,
+      status: values.status,
+      notes: values.notes.trim() || null,
+      contract_start_date: values.contract_start_date || null,
+      contract_end_date: values.contract_end_date || null,
+    });
   }
 
   async function handleSaveField(id: string, patch: Partial<Client>): Promise<string | null> {
@@ -613,6 +790,31 @@ export default function ClientesClient({
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-6">
+        {expiringContracts.length > 0 && (
+          <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <p className="font-medium">
+              ⚠️ {expiringContracts.length} contrato(s) ativo(s) vencido(s) ou vencendo nos próximos{" "}
+              {CONTRACT_WARNING_DAYS} dias:
+            </p>
+            <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+              {expiringContracts.map(({ client, urgency }) => (
+                <li key={client.id}>
+                  <button
+                    type="button"
+                    onClick={() => setDetailClient(client)}
+                    className={`font-medium hover:underline ${
+                      urgency === "expired" ? "text-red-700" : "text-amber-800"
+                    }`}
+                  >
+                    {client.full_name}
+                  </button>{" "}
+                  ({formatDateOnly(client.contract_end_date)})
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="mb-4 flex flex-wrap items-center gap-3">
           <input
             type="text"
@@ -656,6 +858,7 @@ export default function ClientesClient({
                   <th className="px-4 py-2.5">Categoria</th>
                   <th className="px-4 py-2.5">Status</th>
                   <th className="px-4 py-2.5">Valor mensal</th>
+                  <th className="px-4 py-2.5">Contrato até</th>
                   <th className="px-4 py-2.5">Propostas</th>
                   <th className="px-4 py-2.5">Desde</th>
                 </tr>
@@ -700,6 +903,9 @@ export default function ClientesClient({
                     <td className="px-4 py-2.5 font-medium text-emerald-700">
                       {formatCurrency(c.monthly_value)}
                     </td>
+                    <td className="px-4 py-2.5 text-xs" onClick={() => setDetailClient(c)}>
+                      <ContractBadge endDate={c.contract_end_date} today={todayISODate()} />
+                    </td>
                     <td className="px-4 py-2.5 text-neutral-500">
                       {proposalCounts[c.id] ?? 0}
                     </td>
@@ -726,6 +932,7 @@ export default function ClientesClient({
           client={detailClient}
           onClose={() => setDetailClient(null)}
           onSaveField={handleSaveField}
+          onFullEdit={handleFullUpdate}
         />
       )}
     </div>
