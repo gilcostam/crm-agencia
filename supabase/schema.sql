@@ -77,8 +77,19 @@ create trigger leads_set_updated_at
   for each row
   execute function public.set_updated_at();
 
--- Habilita Realtime para a tabela (leads aparecem ao vivo no dashboard)
-alter publication supabase_realtime add table public.leads;
+-- Habilita Realtime para a tabela (leads aparecem ao vivo no dashboard).
+-- Guardado com um check porque "alter publication ... add table" não é
+-- idempotente (dá erro se a tabela já estiver na publicação, ao contrário
+-- de "create table if not exists").
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'leads'
+  ) then
+    alter publication supabase_realtime add table public.leads;
+  end if;
+end $$;
 
 -- RLS: bloqueia acesso público direto. O webhook e as API routes usam a
 -- service_role key (que ignora RLS), então não precisamos de policies
@@ -187,3 +198,57 @@ alter table public.leads
   add column if not exists converted_to_client_id uuid references public.clients(id) on delete set null;
 
 create index if not exists leads_converted_to_client_id_idx on public.leads (converted_to_client_id);
+
+-- Anexos por cliente (mesmo padrão de lead_attachments) — arquivos e
+-- relatórios enviados pela equipe (ex.: prévia de Perfil de Empresa no
+-- Google), guardados no Supabase Storage.
+create table if not exists public.client_attachments (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references public.clients(id) on delete cascade,
+  file_name text not null,
+  storage_path text not null,
+  content_type text,
+  size_bytes bigint,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists client_attachments_client_id_idx on public.client_attachments (client_id, created_at desc);
+
+alter table public.client_attachments enable row level security;
+
+-- Rotina de trabalho por cliente: tarefas com prazo/responsável/recorrência,
+-- consultadas pelos executores da agência (tela /dashboard/tarefas) e no
+-- detalhe de cada cliente. Podem ser criadas manualmente ou importadas
+-- automaticamente a partir de um documento (ex.: plano de SEO local de um
+-- relatório de Perfil de Empresa no Google — ver app/api/clients/[id]/tasks/import).
+create table if not exists public.client_tasks (
+  id uuid primary key default gen_random_uuid(),
+  client_id uuid not null references public.clients(id) on delete cascade,
+  title text not null,
+  description text,
+  -- 'seo_local' | 'avaliacoes' | 'fotos' | 'pendencias' | 'outro'
+  category text not null default 'outro',
+  -- responsável: texto livre (ex.: "Gilmara", "Cliente", "No Limits Marketing Estratégico")
+  responsible text,
+  due_date date,
+  -- null (tarefa pontual) | 'semanal' | 'mensal' | 'continuo'
+  recurrence text,
+  status text not null default 'pendente' check (
+    status in ('pendente', 'em_andamento', 'concluida', 'cancelada')
+  ),
+  -- nome do documento de origem, quando a tarefa foi criada via importação automática
+  source_document text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists client_tasks_client_id_idx on public.client_tasks (client_id, due_date);
+create index if not exists client_tasks_status_idx on public.client_tasks (status);
+create index if not exists client_tasks_due_date_idx on public.client_tasks (due_date);
+
+drop trigger if exists client_tasks_set_updated_at on public.client_tasks;
+create trigger client_tasks_set_updated_at
+  before update on public.client_tasks
+  for each row execute function public.set_updated_at();
+
+alter table public.client_tasks enable row level security;

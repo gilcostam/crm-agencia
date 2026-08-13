@@ -110,6 +110,71 @@ export interface Client {
   updated_at: string;
 }
 
+export interface ClientAttachment {
+  id: string;
+  client_id: string;
+  file_name: string;
+  storage_path: string;
+  content_type: string | null;
+  size_bytes: number | null;
+  created_at: string;
+  url?: string | null;
+}
+
+export type TaskStatus = "pendente" | "em_andamento" | "concluida" | "cancelada";
+
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  pendente: "Pendente",
+  em_andamento: "Em andamento",
+  concluida: "Concluída",
+  cancelada: "Cancelada",
+};
+
+export type TaskCategory = "seo_local" | "avaliacoes" | "fotos" | "pendencias" | "outro";
+
+export const TASK_CATEGORY_LABELS: Record<TaskCategory, string> = {
+  seo_local: "SEO Local",
+  avaliacoes: "Avaliações",
+  fotos: "Fotos",
+  pendencias: "Pendências",
+  outro: "Outro",
+};
+
+export type TaskRecurrence = "semanal" | "mensal" | "continuo";
+
+export const TASK_RECURRENCE_LABELS: Record<TaskRecurrence, string> = {
+  semanal: "Semanal",
+  mensal: "Mensal",
+  continuo: "Contínuo",
+};
+
+export interface ClientTask {
+  id: string;
+  client_id: string;
+  title: string;
+  description: string | null;
+  category: TaskCategory;
+  responsible: string | null;
+  due_date: string | null;
+  recurrence: TaskRecurrence | null;
+  status: TaskStatus;
+  source_document: string | null;
+  created_at: string;
+  updated_at: string;
+  /** Presente quando a API já faz o join com o cliente (listagem global). */
+  client?: Pick<Client, "id" | "full_name"> | null;
+}
+
+/** Tarefa candidata sugerida pelo importador de documentos, ainda não salva. */
+export interface ParsedClientTask {
+  title: string;
+  description: string | null;
+  category: TaskCategory;
+  responsible: string | null;
+  due_date: string | null;
+  recurrence: TaskRecurrence | null;
+}
+
 export type ProposalStatus =
   | "rascunho"
   | "enviada"

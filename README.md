@@ -17,11 +17,18 @@ npm install
    já existente, se preferir).
 2. Abra **SQL Editor** no painel do projeto e rode o conteúdo de
    `supabase/schema.sql` inteiro. Isso cria as tabelas `leads`,
-   `lead_events`, `lead_attachments`, `clients` e `proposals`, os índices,
-   os triggers de `updated_at` e habilita Realtime + RLS.
+   `lead_events`, `lead_attachments`, `clients`, `proposals`,
+   `client_tasks` e `client_attachments`, os índices, os triggers de
+   `updated_at` e habilita Realtime + RLS. O script usa
+   `create table if not exists`, então é seguro rodar de novo em um projeto
+   que já tinha as tabelas antigas — só as tabelas novas (`client_tasks` e
+   `client_attachments`) serão criadas.
 3. (Opcional, só se for usar anexos de leads) Em **Storage**, crie um bucket
    chamado `lead-attachments`. Não precisa deixá-lo público — as rotas de
    anexo usam a `service_role` key e geram URLs assinadas temporárias.
+4. (Opcional, só se for anexar documentos aos clientes — ex.: relatórios de
+   Perfil de Empresa no Google) Em **Storage**, crie também um bucket
+   chamado `client-attachments`, com as mesmas configurações (privado).
 
 ## 3. Configurar variáveis de ambiente
 
@@ -115,7 +122,33 @@ este CRM tem duas pontas:
   Isso registra o evento na timeline do lead e avança automaticamente o
   status de "Novo Lead" para "Primeiro Contato" no primeiro envio.
 
-## 8. Build de produção
+## 8. Rotina de trabalho por cliente (tarefas)
+
+Cada cliente tem um painel de "Rotina de trabalho" (aba/seção no detalhe do
+cliente, em `/dashboard/clientes`) e existe uma visão global em
+`/dashboard/tarefas` para os executores da agência acompanharem tudo (todos
+os clientes, filtrando por responsável).
+
+- **Adicionar manualmente**: título, responsável, data e categoria — direto
+  no painel do cliente.
+- **Importar de um PDF**: no painel do cliente, clique em "Importar plano
+  (PDF)" e envie um relatório de Perfil de Empresa no Google (o mesmo
+  formato exportado por `pesquisa.tngdigital.com.br`, com as seções "Plano
+  de SEO local" e "Avaliações"). O CRM extrai o texto do PDF
+  (`pdf-parse`) e usa um parser determinístico (`lib/gbpTaskParser.ts`,
+  sem IA) para reconhecer prazo/descrição/responsável de cada item. Prazos
+  relativos ("em 7 dias", "em 30 dias") são calculados a partir da
+  "data-âncora" que você define no seletor de data ao lado do botão de
+  importar (por padrão, hoje).
+- **Nada é salvo automaticamente**: a importação só gera uma prévia editável
+  — você pode corrigir título/responsável/data/categoria ou remover itens
+  antes de clicar em "Confirmar importação". Documentos fora desse formato
+  (ou seções não reconhecidas, como "Pendências"/"Fotos a produzir") não
+  geram tarefas automaticamente; adicione-as manualmente se precisar.
+- Tarefas concluídas podem ser marcadas com o checkbox tanto no painel do
+  cliente quanto na visão global de `/dashboard/tarefas`.
+
+## 9. Build de produção
 
 ```bash
 npm run build
@@ -136,19 +169,28 @@ app/
                                        Primeiro/Segundo/Terceiro Contato →
                                        Reunião Marcada → Contrato Assinado →
                                        Finalizado/Desqualificado)
-    clientes/                         Clientes ativos
+    clientes/                         Clientes ativos + rotina de trabalho
+                                       (ClientTasksPanel: tarefas manuais e
+                                       importação de PDF com preview)
+    tarefas/                          Visão global de tarefas (todos os
+                                       clientes) para os executores
     propostas/                        Propostas & contratos (kanban)
     metricas/                         Funil, conversão, MRR
     _components/                      Sidebar, PropostaModal
   api/
     auth/                             Login/logout (cookie assinado HMAC)
     leads/                            CRUD + eventos + anexos + disparo WhatsApp
-    clients/                          CRUD de clientes
+    clients/                          CRUD de clientes + anexos
+    clients/[id]/tasks/               CRUD de tarefas, import (preview) e bulk
+    tasks/                            Listagem global de tarefas
     proposals/                        CRUD de propostas
     webhook/meta/                     Recebe leads do Meta Lead Ads
     webhook/whatsapp/                 Callback do n8n/Evolution API
 lib/
   auth.ts, phone.ts, types.ts, supabase/server.ts
+  gbpTaskParser.ts                    Parser determinístico (sem IA) de
+                                       relatórios de Perfil de Empresa no
+                                       Google → tarefas com prazo/responsável
 scripts/
   import_prospeccao_csv.py            Importa Prospeccao BR USA-Canada/crm.csv
 supabase/

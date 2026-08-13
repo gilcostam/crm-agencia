@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Client, CLIENT_STATUS_LABELS, ClientStatus, Proposal } from "@/lib/types";
 import { sanitizePhone } from "@/lib/phone";
+import ClientTasksPanel from "./ClientTasksPanel";
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("pt-BR");
@@ -524,6 +525,8 @@ function ClientDetailModal({ client, onClose, onSaveField }: ClientDetailModalPr
             </ul>
           )}
         </div>
+
+        <ClientTasksPanel clientId={client.id} />
       </div>
     </div>
   );
