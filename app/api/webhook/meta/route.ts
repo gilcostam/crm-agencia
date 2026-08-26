@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { triggerWhatsappSequence } from "@/lib/whatsapp-automation";
 
 /**
  * GET: handshake de verificação do webhook (Meta chama isso uma vez,
@@ -134,6 +135,17 @@ export async function POST(request: NextRequest) {
       const { leadgen_id, form_id, ad_id } = change.value;
       if (!leadgen_id) continue;
 
+      // Verifica ANTES do upsert se esse leadgen_id já existia, para saber
+      // se este é um lead novo (e portanto candidato ao disparo automático
+      // da sequência de WhatsApp) ou apenas uma reentrega do webhook do Meta
+      // para um lead que já processamos antes.
+      const { data: existingLead } = await supabase
+        .from("leads")
+        .select("id")
+        .eq("leadgen_id", leadgen_id)
+        .maybeSingle();
+      const isNewLead = !existingLead;
+
       // Por padrão, salvamos ao menos o que veio no próprio evento do
       // webhook. Isso garante que o lead NUNCA seja perdido, mesmo que a
       // chamada de enriquecimento à Graph API falhe (permissão, rate limit,
@@ -186,12 +198,31 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const { error } = await supabase.from("leads").upsert(leadRow, {
-        onConflict: "leadgen_id",
-      });
+      const { data: upsertedLead, error } = await supabase
+        .from("leads")
+        .upsert(leadRow, { onConflict: "leadgen_id" })
+        .select("id, full_name, phone, city")
+        .single();
 
       if (error) {
         console.error("Erro ao salvar lead no Supabase:", error.message);
+        continue;
+      }
+
+      // Disparo automático da sequência de WhatsApp: só para leads
+      // genuinamente novos (não reentregas do webhook do Meta) e que vieram
+      // com telefone. Nunca deve derrubar a resposta 200 para o Meta — por
+      // isso o try/catch extra, além do próprio contrato "nunca lança" de
+      // triggerWhatsappSequence.
+      if (isNewLead && upsertedLead?.phone) {
+        try {
+          await triggerWhatsappSequence(supabase, upsertedLead, "auto_meta_ads");
+        } catch (err) {
+          console.error(
+            "Erro inesperado ao disparar sequência automática de WhatsApp para lead do Meta Ads:",
+            err
+          );
+        }
       }
     }
   }

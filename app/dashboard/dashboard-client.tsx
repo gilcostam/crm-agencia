@@ -332,6 +332,7 @@ function LeadDetailModal({
   }
 
   const wa = whatsappUrl(lead.phone, lead.full_name);
+  const alreadySentWhatsapp = events.some((e) => e.type === "whatsapp_sent");
 
   return (
     <div
@@ -411,9 +412,18 @@ function LeadDetailModal({
             title={!lead.phone ? "Lead sem telefone cadastrado" : undefined}
             className="inline-flex items-center gap-1.5 rounded-md bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-neutral-700 disabled:opacity-50"
           >
-            {sendingWhatsapp ? "Disparando..." : "Disparar sequência WhatsApp"}
+            {sendingWhatsapp
+              ? "Disparando..."
+              : alreadySentWhatsapp
+                ? "Reenviar sequência WhatsApp"
+                : "Disparar sequência WhatsApp"}
           </button>
         </div>
+        {alreadySentWhatsapp && !whatsappResult && (
+          <p className="mb-3 text-xs text-neutral-500">
+            ℹ️ Sequência de WhatsApp já foi iniciada para este lead (veja o histórico abaixo).
+          </p>
+        )}
         {whatsappResult && (
           <p className={`mb-3 text-xs ${whatsappResult.ok ? "text-emerald-700" : "text-red-600"}`}>
             {whatsappResult.message}
