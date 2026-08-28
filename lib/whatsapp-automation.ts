@@ -79,5 +79,32 @@ export async function triggerWhatsappSequence(
     );
   }
 
+  // A sequência automática de follow-up (D+1/D+3/D+7) do fluxo n8n está
+  // desativada por enquanto — só a mensagem inicial é enviada sozinha. Para
+  // não perder o timing, agenda automaticamente um aviso de follow-up manual
+  // pra amanhã (D+1), que aparece como badge no card do Kanban
+  // (lead.next_followup, já usado pra outros avisos manuais).
+  const followupDate = new Date();
+  followupDate.setUTCDate(followupDate.getUTCDate() + 1);
+  const nextFollowupISO = followupDate.toISOString().slice(0, 10);
+
+  const { error: leadUpdateError } = await supabase
+    .from("leads")
+    .update({ next_followup: nextFollowupISO })
+    .eq("id", lead.id);
+  if (leadUpdateError) {
+    console.error(
+      `triggerWhatsappSequence (${trigger}): erro ao agendar next_followup:`,
+      leadUpdateError.message
+    );
+  } else {
+    const followupLabel = new Date(`${nextFollowupISO}T00:00:00`).toLocaleDateString("pt-BR");
+    await supabase.from("lead_events").insert({
+      lead_id: lead.id,
+      type: "note",
+      message: `Follow-up manual sugerido para ${followupLabel} (D+1) — a sequência automática de acompanhamento está desativada, só a mensagem inicial foi enviada.`,
+    });
+  }
+
   return { ok: true };
 }
