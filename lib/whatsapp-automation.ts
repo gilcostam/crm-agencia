@@ -4,9 +4,10 @@ import { SupabaseClient } from "@supabase/supabase-js";
  * Dispara a sequência automática de WhatsApp (fluxo n8n "No Limits - Disparo
  * Automático Meta Leads") para um lead específico.
  *
- * O payload segue o mesmo formato esperado pelo nó "Normalizar dados do
- * lead" do fluxo (arquivo Automação WhatsApp/fluxo_nolimits_leads.json):
- * nome, telefone, cidade.
+ * O payload segue o formato esperado pelo nó "Normalizar dados do lead" do
+ * fluxo (chaves `full_name`, `telefone`, `cidade`, `especialidade` — o node
+ * também aceita o payload cru do Meta, mas para o disparo vindo do CRM
+ * usamos sempre estas chaves normalizadas).
  *
  * Usada tanto pelo disparo manual (botão no dashboard) quanto pelo disparo
  * automático (assim que um lead novo chega via webhook do Meta Ads).
@@ -22,6 +23,7 @@ export async function triggerWhatsappSequence(
     full_name: string | null;
     phone: string | null;
     city: string | null;
+    category?: string | null;
   },
   trigger: "manual" | "auto_meta_ads"
 ): Promise<{ ok: boolean; error?: string }> {
@@ -44,9 +46,13 @@ export async function triggerWhatsappSequence(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        nome: lead.full_name,
+        // full_name (não "nome") pra bater com a chave que o nó "Normalizar
+        // dados do lead" do n8n procura — antes disso o nome real do lead
+        // nunca era reconhecido e a mensagem caía no fallback genérico.
+        full_name: lead.full_name,
         telefone: lead.phone,
         cidade: lead.city,
+        especialidade: lead.category,
       }),
     });
 

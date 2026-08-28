@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
       const { data: upsertedLead, error } = await supabase
         .from("leads")
         .upsert(leadRow, { onConflict: "leadgen_id" })
-        .select("id, full_name, phone, city")
+        .select("id, full_name, phone, city, category")
         .single();
 
       if (error) {
