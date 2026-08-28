@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
+import { triggerWhatsappSequence } from "@/lib/whatsapp-automation";
 
 /**
  * Sincronização em tempo real com o board de prospecção no Trello.
@@ -14,6 +15,15 @@ import { createServiceClient } from "@/lib/supabase/server";
  *    scripts/import_trello_leads.py) e fazemos upsert em `leads` usando
  *    `trello:<id do card>` como external_key — mesma chave usada pelo
  *    import manual, então os dois métodos não duplicam entre si.
+ *
+ *  - Disparo automático de WhatsApp: assim como o webhook do Meta Ads
+ *    (app/api/webhook/meta/route.ts), quando este evento cria um lead
+ *    GENUINAMENTE NOVO (não existia ainda pelo external_key) e o card já
+ *    tem telefone preenchido, disparamos a sequência automática de
+ *    WhatsApp (triggerWhatsappSequence) sem exigir clique manual. Esse é
+ *    hoje o principal caminho de entrada de leads no CRM — antes deste
+ *    ajuste, só o disparo manual pelo dashboard funcionava para leads
+ *    vindos do Trello.
  */
 
 const LIST_NAME_TO_STATUS: Record<string, string> = {
@@ -211,7 +221,7 @@ export async function POST(request: NextRequest) {
     const { data: inserted, error } = await supabase
       .from("leads")
       .insert(row)
-      .select("id")
+      .select("id, full_name, phone, city, category")
       .single();
     if (error) {
       console.error("Webhook Trello: erro ao criar lead:", error.message);
@@ -223,6 +233,23 @@ export async function POST(request: NextRequest) {
         type: "created",
         message: `Lead criado via sincronização em tempo real com o Trello (lista "${listName}").`,
       });
+
+      // Disparo automático da sequência de WhatsApp: só para leads
+      // genuinamente novos (não reentregas do webhook do Trello para um
+      // card já sincronizado) e que já vieram com telefone preenchido no
+      // card. Nunca deve derrubar a resposta 200 para o Trello — por isso
+      // o try/catch extra, além do próprio contrato "nunca lança" de
+      // triggerWhatsappSequence.
+      if (inserted.phone) {
+        try {
+          await triggerWhatsappSequence(supabase, inserted, "auto_trello");
+        } catch (err) {
+          console.error(
+            "Erro inesperado ao disparar sequência automática de WhatsApp para lead do Trello:",
+            err
+          );
+        }
+      }
     }
   }
 

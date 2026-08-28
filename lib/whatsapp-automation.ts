@@ -25,7 +25,7 @@ export async function triggerWhatsappSequence(
     city: string | null;
     category?: string | null;
   },
-  trigger: "manual" | "auto_meta_ads"
+  trigger: "manual" | "auto_meta_ads" | "auto_trello"
 ): Promise<{ ok: boolean; error?: string }> {
   const webhookUrl = process.env.N8N_WHATSAPP_WEBHOOK_URL;
   if (!webhookUrl) {
@@ -71,7 +71,9 @@ export async function triggerWhatsappSequence(
   const message =
     trigger === "auto_meta_ads"
       ? "Sequência automática disparada automaticamente ao receber lead via Meta Ads"
-      : "Sequência automática disparada manualmente";
+      : trigger === "auto_trello"
+        ? "Sequência automática disparada automaticamente ao receber lead via Trello"
+        : "Sequência automática disparada manualmente";
 
   const { error: eventError } = await supabase.from("lead_events").insert({
     lead_id: lead.id,
