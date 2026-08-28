@@ -26,6 +26,8 @@ status):
     terceiro contato    -> terceiro_contato
     Reunião Marcada     -> reuniao_marcada (usa o "due" do card como
                            meeting_datetime, se houver)
+    Diagnóstico Enviado -> diagnostico_enviado (adicionado em 2026-08-28,
+                           entre reunião marcada e contrato assinado)
     finalizado          -> finalizado (decisão do usuário: essa lista marca
                            processo de contato encerrado, não
                            necessariamente venda fechada — não usar
@@ -55,6 +57,8 @@ LIST_NAME_TO_STATUS = {
     "terceiro contato": "terceiro_contato",
     "reunião marcada": "reuniao_marcada",
     "reuniao marcada": "reuniao_marcada",
+    "diagnóstico enviado": "diagnostico_enviado",
+    "diagnostico enviado": "diagnostico_enviado",
     "finalizado": "finalizado",
     "desqualificado": "desqualificado",
 }

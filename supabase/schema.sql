@@ -15,6 +15,7 @@ create table if not exists public.leads (
       'segundo_contato',
       'terceiro_contato',
       'reuniao_marcada',
+      'diagnostico_enviado',
       'contrato_assinado',
       'finalizado',
       'desqualificado'

@@ -33,6 +33,8 @@ const LIST_NAME_TO_STATUS: Record<string, string> = {
   "terceiro contato": "terceiro_contato",
   "reunião marcada": "reuniao_marcada",
   "reuniao marcada": "reuniao_marcada",
+  "diagnóstico enviado": "diagnostico_enviado",
+  "diagnostico enviado": "diagnostico_enviado",
   finalizado: "finalizado",
   desqualificado: "desqualificado",
 };

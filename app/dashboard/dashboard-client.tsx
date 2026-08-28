@@ -19,6 +19,7 @@ const STALE_STATUSES: LeadStatus[] = [
   "segundo_contato",
   "terceiro_contato",
   "reuniao_marcada",
+  "diagnostico_enviado",
 ];
 const STALE_DAYS_THRESHOLD = 3;
 
