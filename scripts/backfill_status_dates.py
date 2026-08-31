@@ -66,7 +66,31 @@ LABEL_TO_STATUS = {
     "Desqualificado": "desqualificado",
 }
 
+VALID_STATUSES = set(LABEL_TO_STATUS.values())
+
+# Formato do PATCH manual / webhook do WhatsApp (app/api/leads/[id]/route.ts,
+# app/api/webhook/whatsapp/route.ts): usa os labels em português.
 STATUS_CHANGE_RE = re.compile(r'Status alterado de "([^"]+)" para "([^"]+)"')
+
+# Formato da sincronização reversa do Trello (scripts/sync_leads_to_trello.py
+# ou equivalente): usa as chaves de status cruas (ex.: "novo_lead"), não os
+# labels — separadas por "→".
+TRELLO_SYNC_RE = re.compile(r"Status atualizado via Trello.*?:\s*(\w+)\s*→\s*(\w+)")
+
+
+def extract_to_status(message):
+    """Retorna a chave de status (`LeadStatus`) pra qual o lead foi movido
+    nesse evento, tentando os dois formatos de mensagem conhecidos, ou None
+    se a mensagem não for uma transição de status reconhecível."""
+    m = STATUS_CHANGE_RE.search(message or "")
+    if m:
+        return LABEL_TO_STATUS.get(m.group(2))
+
+    m = TRELLO_SYNC_RE.search(message or "")
+    if m and m.group(2) in VALID_STATUSES:
+        return m.group(2)
+
+    return None
 
 
 def api_get(base_url, headers, path):
@@ -132,12 +156,7 @@ def main():
     reconstructed = {}  # lead_id -> {status: iso_date}
     unmatched = 0
     for ev in events:
-        m = STATUS_CHANGE_RE.search(ev["message"] or "")
-        if not m:
-            unmatched += 1
-            continue
-        to_label = m.group(2)
-        to_status = LABEL_TO_STATUS.get(to_label)
+        to_status = extract_to_status(ev["message"])
         if not to_status:
             unmatched += 1
             continue
