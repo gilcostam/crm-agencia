@@ -855,8 +855,19 @@ function NewLeadModal({ onClose, onCreate }: NewLeadModalProps) {
 
 export default function DashboardClient({
   initialLeads,
+  title = "Leads",
+  pollQuery = "",
 }: {
   initialLeads: Lead[];
+  /** Título exibido no cabeçalho da página (ex.: "Prospecção Ativa" na tela
+   * de prospecção, ver app/dashboard/prospeccao/page.tsx). Default "Leads". */
+  title?: string;
+  /** Query string extra anexada ao polling `GET /api/leads` (ex.:
+   * "source=tng_prospeccao,prospeccao" ou "excludeSource=..."), pra manter o
+   * recorte de leads consistente com o que o server component já carregou em
+   * `initialLeads` — sem isso, o polling a cada poucos segundos substituiria
+   * o recorte filtrado pela lista completa de leads. */
+  pollQuery?: string;
 }) {
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -904,7 +915,8 @@ export default function DashboardClient({
 
   const refresh = useCallback(async () => {
     try {
-      const response = await fetch("/api/leads", { cache: "no-store" });
+      const url = pollQuery ? `/api/leads?${pollQuery}` : "/api/leads";
+      const response = await fetch(url, { cache: "no-store" });
       if (!response.ok) return;
       const data = await response.json();
       const newLeads: Lead[] = data.leads ?? [];
@@ -915,11 +927,11 @@ export default function DashboardClient({
         setTimeout(() => setFlashIds(new Set()), 3000);
         playNotificationSound();
         if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-          const title =
+          const notifTitle =
             freshlyArrived.length === 1
               ? `Novo lead: ${freshlyArrived[0].full_name || "sem nome"}`
               : `${freshlyArrived.length} novos leads`;
-          new Notification(title, { body: "Clique pra abrir o CRM" });
+          new Notification(notifTitle, { body: "Clique pra abrir o CRM" });
         }
       }
       knownIds.current = new Set(newLeads.map((l) => l.id));
@@ -964,7 +976,7 @@ export default function DashboardClient({
     } catch {
       // silencioso: próxima tentativa de polling resolve
     }
-  }, []);
+  }, [pollQuery]);
 
   useEffect(() => {
     const interval = setInterval(refresh, POLL_INTERVAL_MS);
@@ -1149,7 +1161,7 @@ export default function DashboardClient({
     <div className="min-h-screen bg-neutral-100">
       <header className="border-b border-neutral-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-          <h1 className="font-serif text-2xl text-neutral-900">Leads</h1>
+          <h1 className="font-serif text-2xl text-neutral-900">{title}</h1>
           <span className="text-xs text-neutral-400">
             Atualizado {formatDate(lastUpdate.toISOString())}
           </span>

@@ -9,6 +9,14 @@ export type LeadStatus =
   | "finalizado"
   | "desqualificado";
 
+/** Valores de `Lead.source` que representam prospecção ativa (outbound) —
+ * leads que a própria agência foi buscar (TNG Pesquisa/Maps, ou a extração
+ * mais antiga via scripts/import_prospeccao_csv.py) — em vez de terem chegado
+ * por tráfego pago (Meta Ads), Trello ou cadastro manual. Usado pra separar
+ * o Kanban de "Leads" (tráfego pago) do menu "Prospecção Ativa" no dashboard
+ * (ver app/dashboard/prospeccao/page.tsx e app/api/leads/route.ts). */
+export const ACTIVE_PROSPECTING_SOURCES = ["tng_prospeccao", "prospeccao"] as const;
+
 export interface Lead {
   id: string;
   full_name: string | null;

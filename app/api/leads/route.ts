@@ -4,7 +4,13 @@ import { hasValidSession, isValidSessionToken, SESSION_COOKIE_NAME } from "@/lib
 import { createServiceClient } from "@/lib/supabase/server";
 import { STATUS_ORDER } from "@/lib/types";
 
-export async function GET() {
+/** Usado pelo polling do dashboard (app/dashboard/dashboard-client.tsx) pra
+ * manter cada tela restrita ao mesmo recorte de leads que o server component
+ * carregou inicialmente: `?source=a,b` inclui só esses `source`, `?excludeSource=a,b`
+ * exclui esses `source` (mutuamente exclusivos — se os dois vierem, `source`
+ * tem prioridade). Sem nenhum dos dois, retorna todos os leads (comportamento
+ * de sempre). */
+export async function GET(request: NextRequest) {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
 
@@ -12,12 +18,23 @@ export async function GET() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const includeSource = searchParams.get("source");
+  const excludeSource = searchParams.get("excludeSource");
+
   const supabase = createServiceClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("leads")
     .select("*")
-    .is("merged_into_lead_id", null)
-    .order("created_at", { ascending: false });
+    .is("merged_into_lead_id", null);
+
+  if (includeSource) {
+    query = query.in("source", includeSource.split(","));
+  } else if (excludeSource) {
+    query = query.not("source", "in", `(${excludeSource.split(",").join(",")})`);
+  }
+
+  const { data, error } = await query.order("created_at", { ascending: false });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

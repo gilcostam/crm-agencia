@@ -6,6 +6,7 @@ import Link from "next/link";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Leads", icon: LeadsIcon },
+  { href: "/dashboard/prospeccao", label: "Prospecção Ativa", icon: ProspeccaoIcon },
   { href: "/dashboard/clientes", label: "Clientes", icon: ClientsIcon },
   { href: "/dashboard/tarefas", label: "Tarefas", icon: TasksIcon },
   { href: "/dashboard/propostas", label: "Propostas", icon: ProposalsIcon },
@@ -18,6 +19,15 @@ function LeadsIcon() {
       <rect x="2.5" y="4" width="4.2" height="12" rx="1" />
       <rect x="7.9" y="4" width="4.2" height="8" rx="1" />
       <rect x="13.3" y="4" width="4.2" height="15" rx="1" />
+    </svg>
+  );
+}
+
+function ProspeccaoIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      <circle cx="8.5" cy="8.5" r="5.5" />
+      <path d="M16.5 16.5 13 13" strokeLinecap="round" />
     </svg>
   );
 }
