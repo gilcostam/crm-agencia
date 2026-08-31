@@ -1272,7 +1272,12 @@ export default function DashboardClient({
           )}
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* overflow-x-auto + scaleY(-1) no wrapper (e de novo no conteúdo,
+            pra desfazer a inversão visual) é o truque padrão de CSS pra
+            colocar a barra de rolagem horizontal no topo do bloco em vez de
+            embaixo — útil aqui porque as colunas podem ficar bem altas. */}
+        <div className="overflow-x-auto pb-2" style={{ transform: "scaleY(-1)" }}>
+        <div className="flex min-w-min gap-4" style={{ transform: "scaleY(-1)" }}>
           {STATUS_ORDER.map((status) => {
             const columnLeads = filteredLeads.filter((l) => l.status === status);
             return (
@@ -1292,7 +1297,7 @@ export default function DashboardClient({
                   if (leadId) updateStatus(leadId, status);
                   setDragOverStatus(null);
                 }}
-                className={`rounded-lg bg-white p-3 shadow-sm transition ${
+                className={`w-72 shrink-0 rounded-lg bg-white p-3 shadow-sm transition ${
                   dragOverStatus === status ? "ring-2 ring-neutral-900" : ""
                 }`}
               >
@@ -1416,6 +1421,7 @@ export default function DashboardClient({
               </div>
             );
           })}
+        </div>
         </div>
       </main>
 
