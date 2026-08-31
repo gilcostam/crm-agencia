@@ -11,6 +11,7 @@ import {
   STATUS_ORDER,
 } from "@/lib/types";
 import { sanitizePhone } from "@/lib/phone";
+import WhatsAppComposerModal from "./_components/WhatsAppComposerModal";
 
 const POLL_INTERVAL_MS = 4000;
 const STALE_STATUSES: LeadStatus[] = [
@@ -202,6 +203,7 @@ interface LeadDetailModalProps {
   onSaveMeeting: (id: string, meetingIso: string | null) => Promise<void>;
   onSaveMonthlyValue: (id: string, value: number | null) => Promise<void>;
   onSaveNextFollowup: (id: string, date: string | null) => Promise<void>;
+  onOpenComposer: (id: string) => void;
 }
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
@@ -222,6 +224,7 @@ function LeadDetailModal({
   onSaveMeeting,
   onSaveMonthlyValue,
   onSaveNextFollowup,
+  onOpenComposer,
 }: LeadDetailModalProps) {
   const [notes, setNotes] = useState(lead.notes ?? "");
   const [meetingValue, setMeetingValue] = useState(toDatetimeLocalValue(lead.meeting_datetime));
@@ -380,15 +383,14 @@ function LeadDetailModal({
 
         <div className="mb-4 flex flex-wrap gap-2">
           {wa && (
-            <a
-              href={wa}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={() => onOpenComposer(lead.id)}
               className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600"
             >
               <WhatsAppIcon />
               Conversar no WhatsApp
-            </a>
+            </button>
           )}
           {lead.email && (
             <a
@@ -912,6 +914,7 @@ export default function DashboardClient({
   const knownIds = useRef<Set<string>>(new Set(initialLeads.map((l) => l.id)));
   const [flashIds, setFlashIds] = useState<Set<string>>(new Set());
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [composerLeadId, setComposerLeadId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState("");
@@ -1240,6 +1243,7 @@ export default function DashboardClient({
   }, [leads]);
 
   const selectedLead = leads.find((l) => l.id === selectedLeadId) ?? null;
+  const composerLead = leads.find((l) => l.id === composerLeadId) ?? null;
 
   return (
     <div className="min-h-screen bg-neutral-100">
@@ -1499,16 +1503,17 @@ export default function DashboardClient({
                             {lead.full_name || "Sem nome"}
                           </p>
                           {wa && (
-                            <a
-                              href={wa}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setComposerLeadId(lead.id);
+                              }}
                               title="Conversar no WhatsApp"
                               className="shrink-0 rounded-full bg-emerald-500 p-1.5 text-white hover:bg-emerald-600"
                             >
                               <WhatsAppIcon />
-                            </a>
+                            </button>
                           )}
                         </div>
                         {lead.phone && (
@@ -1591,7 +1596,12 @@ export default function DashboardClient({
           onSaveMeeting={saveMeeting}
           onSaveMonthlyValue={saveMonthlyValue}
           onSaveNextFollowup={saveNextFollowup}
+          onOpenComposer={setComposerLeadId}
         />
+      )}
+
+      {composerLead && (
+        <WhatsAppComposerModal lead={composerLead} onClose={() => setComposerLeadId(null)} />
       )}
 
       {showNewLeadModal && (
