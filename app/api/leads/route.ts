@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { hasValidSession, isValidSessionToken, SESSION_COOKIE_NAME } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
-import { STATUS_ORDER } from "@/lib/types";
+import { LeadStatus, STATUS_ORDER } from "@/lib/types";
+import { buildStatusChangeUpdate } from "@/lib/lead-status";
 
 /** Usado pelo polling do dashboard (app/dashboard/dashboard-client.tsx) pra
  * manter cada tela restrita ao mesmo recorte de leads que o server component
@@ -88,6 +89,17 @@ export async function POST(request: NextRequest) {
 
   const supabase = createServiceClient();
 
+  const initialStatus = (status ?? "novo_lead") as LeadStatus;
+  // Se o cadastro manual já entra num status além de "Novo Lead" (ex.: uma
+  // reunião que já tinha sido marcada por outro canal), registra a data
+  // dessa transição em status_dates e aplica a mesma política de follow-up
+  // automático (48h) usada pelas demais mudanças de status — ver
+  // lib/lead-status.ts.
+  const statusExtras: {
+    status_dates?: Partial<Record<LeadStatus, string>>;
+    next_followup?: string | null;
+  } = initialStatus === "novo_lead" ? {} : buildStatusChangeUpdate({}, initialStatus);
+
   const { data, error } = await supabase
     .from("leads")
     .insert({
@@ -96,10 +108,14 @@ export async function POST(request: NextRequest) {
       email: emailTrimmed || null,
       city: city?.trim() || null,
       category: category?.trim() || null,
-      status: status ?? "novo_lead",
+      status: initialStatus,
       source: "manual",
       notes: notes?.trim() || null,
       monthly_value: monthly_value ?? null,
+      ...(statusExtras.status_dates ? { status_dates: statusExtras.status_dates } : {}),
+      ...(statusExtras.next_followup !== undefined
+        ? { next_followup: statusExtras.next_followup }
+        : {}),
     })
     .select()
     .single();

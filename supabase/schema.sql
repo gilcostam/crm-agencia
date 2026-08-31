@@ -273,3 +273,14 @@ create index if not exists clients_contract_end_date_idx on public.clients (cont
 -- app/dashboard/clientes/ClientTasksPanel.tsx).
 alter table public.client_tasks
   add column if not exists completed_at timestamptz;
+
+-- Guarda, por lead, a data/hora em que cada status foi alcançado pela
+-- primeira/última vez (ex.: {"primeiro_contato": "2026-08-20T14:03:00Z",
+-- "segundo_contato": "...", ...}) — "novo_lead" não entra aqui, usa-se
+-- leads.created_at pra isso. Preenchido automaticamente sempre que o status
+-- muda (ver lib/lead-status.ts, usado por app/api/leads/[id]/route.ts e
+-- app/api/webhook/whatsapp/route.ts) e alimenta a "Linha do tempo de status"
+-- no modal de detalhe do lead (app/dashboard/dashboard-client.tsx) — dá pra
+-- ver quando o lead chegou, quando foi o 1º/2º/3º contato etc.
+alter table public.leads
+  add column if not exists status_dates jsonb not null default '{}'::jsonb;

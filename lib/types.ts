@@ -25,6 +25,12 @@ export interface Lead {
   city: string | null;
   category: string | null;
   status: LeadStatus;
+  /** Data/hora (ISO) em que cada status foi alcançado pela última vez — não
+   * inclui "novo_lead" (usar `created_at` pra isso). Preenchido
+   * automaticamente pelo backend a cada mudança de status (ver
+   * lib/lead-status.ts). Alimenta a linha do tempo de status no modal de
+   * detalhe do lead. */
+  status_dates: Partial<Record<LeadStatus, string>>;
   source: string;
   /** Chave de dedupe vinda da prospecção (crm.csv/crm.py) — normalmente a
    * URL do Google Maps do lead, ou nome+endereço quando não há link. */

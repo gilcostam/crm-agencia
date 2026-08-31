@@ -32,6 +32,7 @@ export default async function ProspeccaoPage() {
       initialLeads={(data as Lead[]) ?? []}
       title="Prospecção Ativa"
       pollQuery={`source=${ACTIVE_PROSPECTING_SOURCES.join(",")}`}
+      enableTngImport
     />
   );
 }

@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { sanitizePhone } from "@/lib/phone";
+import { buildStatusChangeUpdate } from "@/lib/lead-status";
 
 /**
  * Callback do fluxo n8n / Evolution API: recebe confirmação de que uma
@@ -57,17 +58,19 @@ export async function POST(request: NextRequest) {
 
   let leadId = lead_id ?? null;
   let leadStatus: string | null = null;
+  let leadStatusDates: unknown = null;
 
   if (leadId) {
     const { data: lead } = await supabase
       .from("leads")
-      .select("id, status")
+      .select("id, status, status_dates")
       .eq("id", leadId)
       .single();
     if (!lead) {
       return NextResponse.json({ error: "Lead não encontrado" }, { status: 404 });
     }
     leadStatus = lead.status;
+    leadStatusDates = lead.status_dates;
   } else if (phone) {
     const digits = sanitizePhone(phone);
     if (!digits) {
@@ -79,7 +82,7 @@ export async function POST(request: NextRequest) {
     const suffix = digits.slice(-10);
     const { data: candidates } = await supabase
       .from("leads")
-      .select("id, status, phone")
+      .select("id, status, phone, status_dates")
       .ilike("phone", `%${suffix}%`)
       .is("merged_into_lead_id", null)
       .order("created_at", { ascending: false })
@@ -90,6 +93,7 @@ export async function POST(request: NextRequest) {
     }
     leadId = candidates[0].id;
     leadStatus = candidates[0].status;
+    leadStatusDates = candidates[0].status_dates;
   }
 
   if (!leadId) {
@@ -119,18 +123,35 @@ export async function POST(request: NextRequest) {
       .eq("type", "whatsapp_sent");
 
     if ((count ?? 0) <= 1) {
+      const statusUpdate = buildStatusChangeUpdate(leadStatusDates, "primeiro_contato");
       const { error: updateError } = await supabase
         .from("leads")
-        .update({ status: "primeiro_contato" })
+        .update({
+          status: statusUpdate.status,
+          status_dates: statusUpdate.status_dates,
+          ...(statusUpdate.next_followup !== undefined
+            ? { next_followup: statusUpdate.next_followup }
+            : {}),
+        })
         .eq("id", leadId);
       if (updateError) {
         console.error("Erro ao avançar status do lead para 'primeiro_contato':", updateError.message);
       } else {
-        const { error: statusEventError } = await supabase.from("lead_events").insert({
-          lead_id: leadId,
-          type: "status_change",
-          message: 'Status alterado de "Novo Lead" para "Primeiro Contato" (primeiro envio automático de WhatsApp)',
-        });
+        const events = [
+          {
+            lead_id: leadId,
+            type: "status_change",
+            message: 'Status alterado de "Novo Lead" para "Primeiro Contato" (primeiro envio automático de WhatsApp)',
+          },
+        ];
+        if (statusUpdate.next_followup) {
+          events.push({
+            lead_id: leadId,
+            type: "note",
+            message: `Follow-up automático agendado para ${new Date(`${statusUpdate.next_followup}T00:00:00`).toLocaleDateString("pt-BR")} (48h após este contato)`,
+          });
+        }
+        const { error: statusEventError } = await supabase.from("lead_events").insert(events);
         if (statusEventError) {
           console.error("Erro ao registrar evento de status:", statusEventError.message);
         }

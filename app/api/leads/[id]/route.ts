@@ -3,6 +3,7 @@ import { hasValidSession } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { LeadStatus, STATUS_LABELS, STATUS_ORDER } from "@/lib/types";
 import { syncLeadStatusToTrello } from "@/lib/trello";
+import { buildStatusChangeUpdate, FOLLOWUP_INTERVAL_HOURS } from "@/lib/lead-status";
 
 export async function PATCH(
   request: NextRequest,
@@ -32,7 +33,16 @@ export async function PATCH(
     category?: string | null;
   };
 
-  const update: Record<string, string | number | null> = {};
+  const update: {
+    status?: string;
+    notes?: string;
+    meeting_datetime?: string | null;
+    monthly_value?: number | null;
+    next_followup?: string | null;
+    city?: string | null;
+    category?: string | null;
+    status_dates?: Partial<Record<LeadStatus, string>>;
+  } = {};
 
   if (status !== undefined) {
     if (!STATUS_ORDER.includes(status as (typeof STATUS_ORDER)[number])) {
@@ -83,9 +93,26 @@ export async function PATCH(
   // seguimos com o update normalmente, só não geramos o evento).
   const { data: before } = await supabase
     .from("leads")
-    .select("status, notes, meeting_datetime, monthly_value, converted_to_client_id, external_key")
+    .select(
+      "status, notes, meeting_datetime, monthly_value, converted_to_client_id, external_key, status_dates"
+    )
     .eq("id", id)
     .single();
+
+  // Se o status está mudando de verdade, registra a data dessa transição em
+  // `status_dates` e (a não ser que o pedido já tenha informado
+  // `next_followup` explicitamente) agenda/limpa o próximo follow-up
+  // automaticamente, seguindo os 48h combinados entre contatos — ver
+  // lib/lead-status.ts.
+  if (status !== undefined && before && before.status !== status) {
+    const statusUpdate = buildStatusChangeUpdate(before.status_dates, status as LeadStatus, {
+      explicitNextFollowup: next_followup !== undefined,
+    });
+    update.status_dates = statusUpdate.status_dates;
+    if (statusUpdate.next_followup !== undefined) {
+      update.next_followup = statusUpdate.next_followup;
+    }
+  }
 
   const { data, error } = await supabase
     .from("leads")
@@ -109,6 +136,17 @@ export async function PATCH(
         type: "status_change",
         message: `Status alterado de "${fromLabel}" para "${toLabel}"`,
       });
+
+      if (next_followup === undefined && update.next_followup !== undefined) {
+        events.push({
+          lead_id: id,
+          type: "note",
+          message:
+            update.next_followup === null
+              ? "Follow-up pendente removido automaticamente (status de saída do funil de contato)"
+              : `Follow-up automático agendado para ${new Date(`${update.next_followup}T00:00:00`).toLocaleDateString("pt-BR")} (${FOLLOWUP_INTERVAL_HOURS}h após este contato)`,
+        });
+      }
 
       // Sincronização reversa: se este lead veio do Trello (external_key
       // "trello:<id>"), move o card pra lista equivalente ao novo status.

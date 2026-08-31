@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Lead,
@@ -459,6 +459,37 @@ function LeadDetailModal({
         </div>
 
         <div className="mt-4">
+          <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-neutral-500">
+            Linha do tempo de status
+          </label>
+          <ul className="space-y-1.5 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2.5">
+            {STATUS_ORDER.filter(
+              (s) => s !== "desqualificado" || Boolean(lead.status_dates?.desqualificado)
+            ).map((s) => {
+              const date = s === "novo_lead" ? lead.created_at : lead.status_dates?.[s];
+              return (
+                <li
+                  key={s}
+                  className={`flex items-center justify-between gap-2 text-xs ${
+                    date ? "text-neutral-700" : "text-neutral-300"
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span
+                      className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
+                        date ? "bg-emerald-500" : "bg-neutral-300"
+                      }`}
+                    />
+                    {STATUS_LABELS[s]}
+                  </span>
+                  <span className="shrink-0">{date ? formatDate(date) : "—"}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        <div className="mt-4">
           <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-neutral-500">
             Reunião agendada
           </label>
@@ -550,6 +581,9 @@ function LeadDetailModal({
                 Salvar
               </button>
             </div>
+            <p className="mt-1 text-[10px] text-neutral-400">
+              Sugerido automaticamente 48h após 1º/2º/3º contato — editável.
+            </p>
           </div>
         </div>
 
@@ -857,6 +891,7 @@ export default function DashboardClient({
   initialLeads,
   title = "Leads",
   pollQuery = "",
+  enableTngImport = false,
 }: {
   initialLeads: Lead[];
   /** Título exibido no cabeçalho da página (ex.: "Prospecção Ativa" na tela
@@ -868,6 +903,9 @@ export default function DashboardClient({
    * `initialLeads` — sem isso, o polling a cada poucos segundos substituiria
    * o recorte filtrado pela lista completa de leads. */
   pollQuery?: string;
+  /** Mostra o botão "Importar CSV do TNG Pesquisa" no toolbar — só faz
+   * sentido na tela de Prospecção Ativa (ver app/dashboard/prospeccao/page.tsx). */
+  enableTngImport?: boolean;
 }) {
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -881,6 +919,15 @@ export default function DashboardClient({
   const [dragOverStatus, setDragOverStatus] = useState<LeadStatus | null>(null);
   const [showNewLeadModal, setShowNewLeadModal] = useState(false);
   const [conversionNotice, setConversionNotice] = useState<{ leadName: string } | null>(null);
+  const [importingTng, setImportingTng] = useState(false);
+  const [tngImportError, setTngImportError] = useState<string | null>(null);
+  const [tngImportResult, setTngImportResult] = useState<{
+    totalRows: number;
+    skippedNoPhone: number;
+    mergedCount: number;
+    imported: number;
+  } | null>(null);
+  const tngFileInputRef = useRef<HTMLInputElement>(null);
   // Controla quais lembretes já notificamos nesta sessão, pra não repetir
   // a cada ciclo de polling (4s) enquanto a aba fica aberta. Pré-populado
   // com o estado já existente ao abrir a página — os selos visuais no
@@ -988,6 +1035,43 @@ export default function DashboardClient({
     const timeout = setTimeout(() => setConversionNotice(null), 12000);
     return () => clearTimeout(timeout);
   }, [conversionNotice]);
+
+  useEffect(() => {
+    if (!tngImportResult && !tngImportError) return;
+    const timeout = setTimeout(() => {
+      setTngImportResult(null);
+      setTngImportError(null);
+    }, 15000);
+    return () => clearTimeout(timeout);
+  }, [tngImportResult, tngImportError]);
+
+  async function handleTngCsvChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportingTng(true);
+    setTngImportError(null);
+    setTngImportResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/leads/import-tng", { method: "POST", body: formData });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data) {
+        setTngImportError(data?.error || "Erro ao importar o CSV.");
+      } else {
+        setTngImportResult(data);
+        await refresh();
+      }
+    } catch {
+      setTngImportError("Erro de conexão ao importar o CSV.");
+    } finally {
+      setImportingTng(false);
+      if (tngFileInputRef.current) tngFileInputRef.current.value = "";
+    }
+  }
 
   async function updateStatus(id: string, status: LeadStatus) {
     const previousLead = leads.find((l) => l.id === id);
@@ -1209,6 +1293,48 @@ export default function DashboardClient({
           </div>
         )}
 
+        {enableTngImport && (tngImportResult || tngImportError) && (
+          <div
+            className={`mb-5 flex items-center justify-between rounded-md border px-4 py-2.5 text-sm ${
+              tngImportError
+                ? "border-red-300 bg-red-50 text-red-800"
+                : "border-emerald-300 bg-emerald-50 text-emerald-800"
+            }`}
+          >
+            <span>
+              {tngImportError
+                ? `❌ ${tngImportError}`
+                : tngImportResult && (
+                    <>
+                      ✅ CSV importado: <strong>{tngImportResult.imported}</strong> leads
+                      criados/atualizados de {tngImportResult.totalRows} linhas
+                      {tngImportResult.skippedNoPhone > 0
+                        ? ` (${tngImportResult.skippedNoPhone} sem telefone, puladas)`
+                        : ""}
+                      {tngImportResult.mergedCount > 0
+                        ? ` (${tngImportResult.mergedCount} agrupadas por telefone compartilhado)`
+                        : ""}
+                      .
+                    </>
+                  )}
+            </span>
+            <button
+              onClick={() => {
+                setTngImportResult(null);
+                setTngImportError(null);
+              }}
+              className={`ml-3 shrink-0 ${
+                tngImportError
+                  ? "text-red-500 hover:text-red-900"
+                  : "text-emerald-500 hover:text-emerald-900"
+              }`}
+              aria-label="Fechar aviso"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         <div className="mb-5 flex flex-wrap items-center gap-3">
           <input
             type="search"
@@ -1271,6 +1397,24 @@ export default function DashboardClient({
           >
             Exportar CSV
           </button>
+          {enableTngImport && (
+            <>
+              <input
+                ref={tngFileInputRef}
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={handleTngCsvChange}
+              />
+              <button
+                onClick={() => tngFileInputRef.current?.click()}
+                disabled={importingTng}
+                className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {importingTng ? "Importando..." : "Importar CSV do TNG Pesquisa"}
+              </button>
+            </>
+          )}
           <button
             onClick={() => setShowNewLeadModal(true)}
             className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-700"
