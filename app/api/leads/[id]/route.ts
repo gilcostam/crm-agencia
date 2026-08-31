@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { hasValidSession } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
 import { LeadStatus, STATUS_LABELS, STATUS_ORDER } from "@/lib/types";
+import { syncLeadStatusToTrello } from "@/lib/trello";
 
 export async function PATCH(
   request: NextRequest,
@@ -82,7 +83,7 @@ export async function PATCH(
   // seguimos com o update normalmente, só não geramos o evento).
   const { data: before } = await supabase
     .from("leads")
-    .select("status, notes, meeting_datetime, monthly_value, converted_to_client_id")
+    .select("status, notes, meeting_datetime, monthly_value, converted_to_client_id, external_key")
     .eq("id", id)
     .single();
 
@@ -108,6 +109,19 @@ export async function PATCH(
         type: "status_change",
         message: `Status alterado de "${fromLabel}" para "${toLabel}"`,
       });
+
+      // Sincronização reversa: se este lead veio do Trello (external_key
+      // "trello:<id>"), move o card pra lista equivalente ao novo status.
+      // Best-effort e nunca lança — não pode derrubar a resposta do PATCH
+      // por causa de uma falha na API do Trello (ver lib/trello.ts).
+      try {
+        const trelloResult = await syncLeadStatusToTrello(before.external_key, status as LeadStatus);
+        if (!trelloResult.ok) {
+          console.error("Sync CRM->Trello falhou:", trelloResult.error);
+        }
+      } catch (err) {
+        console.error("Erro inesperado ao chamar sync CRM->Trello:", err);
+      }
     }
 
     if (notes !== undefined && (before.notes ?? "") !== notes) {
