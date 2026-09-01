@@ -227,6 +227,21 @@ Se fizer sentido pra você, tenho um horário livre essa semana pra conversarmos
     ),
   },
   {
+    id: "no_show_resgate",
+    label: "Resgate (não compareceu)",
+    description:
+      "Para quem faltou à reunião marcada: sem cobrança, gera senso de perda em relação aos concorrentes e desperta curiosidade pra receber a análise de posicionamento.",
+    appliesTo: ["no_show"],
+    channel: "ambos",
+    text: withSignature(
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}tudo bem? Não consegui falar com você no horário que tínhamos combinado, sem problema, imagino que a rotina tenha complicado.
+
+Só não queria que isso te custasse a chance de ver o que encontramos: enquanto{{#categoria}} outros negócios de {{categoria}}{{/categoria}}{{^categoria}} os concorrentes{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} vêm aparecendo mais no Google e sendo recomendados pelas ferramentas de IA, isso significa pacientes indo pra eles em vez de pra vocês.
+
+Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espaço hoje e o que dá pra fazer pra reverter isso ainda esse mês. Quer que eu te mande agora, ou prefere remarcar um horário rapidinho?`
+    ),
+  },
+  {
     id: "personalizada",
     label: "Mensagem em branco",
     description: "Sem modelo. Escreva do zero, usado como padrão fora do funil de contato (Contrato Assinado, Finalizado, Desqualificado).",

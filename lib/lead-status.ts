@@ -6,11 +6,14 @@ import { LeadStatus } from "./types";
 export const FOLLOWUP_INTERVAL_HOURS = 48;
 
 /** Status que, ao serem alcançados, disparam o agendamento automático do
- * próximo follow-up (48h à frente) — a sequência de tentativas de contato. */
+ * próximo follow-up (48h à frente) — a sequência de tentativas de contato.
+ * "no_show" entra aqui também: vira um lembrete de mandar a mensagem de
+ * resgate pra quem faltou à reunião. */
 const AUTO_FOLLOWUP_STATUSES: LeadStatus[] = [
   "primeiro_contato",
   "segundo_contato",
   "terceiro_contato",
+  "no_show",
 ];
 
 /** Status "de saída" do funil de contato — ao entrar neles não faz mais

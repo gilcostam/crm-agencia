@@ -26,6 +26,9 @@ status):
     terceiro contato    -> terceiro_contato
     Reunião Marcada     -> reuniao_marcada (usa o "due" do card como
                            meeting_datetime, se houver)
+    No Show             -> no_show (adicionado em 2026-09-01, lead faltou à
+                           reunião marcada; entra entre reunião marcada e
+                           diagnóstico enviado)
     Diagnóstico Enviado -> diagnostico_enviado (adicionado em 2026-08-28,
                            entre reunião marcada e contrato assinado)
     finalizado          -> finalizado (decisão do usuário: essa lista marca
@@ -57,6 +60,9 @@ LIST_NAME_TO_STATUS = {
     "terceiro contato": "terceiro_contato",
     "reunião marcada": "reuniao_marcada",
     "reuniao marcada": "reuniao_marcada",
+    "no show": "no_show",
+    "não compareceu": "no_show",
+    "nao compareceu": "no_show",
     "diagnóstico enviado": "diagnostico_enviado",
     "diagnostico enviado": "diagnostico_enviado",
     "finalizado": "finalizado",

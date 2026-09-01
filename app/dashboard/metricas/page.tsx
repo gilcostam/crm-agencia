@@ -44,6 +44,7 @@ const STATUS_COLORS: Record<string, string> = {
   segundo_contato: "bg-cyan-500",
   terceiro_contato: "bg-purple-500",
   reuniao_marcada: "bg-amber-500",
+  no_show: "bg-orange-600",
   diagnostico_enviado: "bg-indigo-500",
   contrato_assinado: "bg-emerald-500",
   finalizado: "bg-red-500",
