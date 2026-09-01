@@ -180,8 +180,8 @@ export const WHATSAPP_TEMPLATES: WhatsappTemplate[] = [
     id: "boas_vindas_pago",
     label: "Boas-vindas (mensagem automática)",
     description:
-      "Esta mensagem já é enviada automaticamente assim que o lead chega (Meta Ads/Trello). Use este modelo só pra reenviar manualmente, se precisar.",
-    appliesTo: ["novo_lead", "primeiro_contato"],
+      "Esta mensagem já é enviada automaticamente assim que o lead chega (Meta Ads/Trello), o status só avança para 'Primeiro Contato' depois que ela sai. Use este modelo só pra reenviar manualmente, se por algum motivo ela não tiver sido entregue.",
+    appliesTo: ["novo_lead"],
     channel: "pago",
     text: `Oi{{#primeiro_nome}}, {{primeiro_nome}}{{/primeiro_nome}}! Aqui é da No Limits Marketing.
 
@@ -193,8 +193,8 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
     id: "diagnostico_ia",
     label: "Diagnóstico (Google e IA)",
     description:
-      "2º contato: já é a apresentação do diagnóstico em texto, comparando o lead com o concorrente e destacando a busca por IA. Preencha as avaliações/concorrente antes de enviar.",
-    appliesTo: ["segundo_contato"],
+      "Primeiro contato feito por um humano, mandado logo depois da boas-vindas automática: apresenta o diagnóstico em texto, comparando o lead com o concorrente e destacando a busca por IA. Preencha as avaliações/concorrente antes de enviar.",
+    appliesTo: ["primeiro_contato"],
     channel: "pago",
     text: `Nosso time fez uma análise rápida e gratuita da presença digital d{{#categoria}}o seu negócio de {{categoria}}{{/categoria}}{{^categoria}}o seu negócio{{/categoria}} no Google, comparando com os concorrentes mais bem posicionados{{#cidade}} em {{cidade}}{{/cidade}}, e também testamos como vocês aparecem quando alguém procura {{#categoria}}"{{categoria}}{{#cidade}} em {{cidade}}{{/cidade}}"{{/categoria}}{{^categoria}}esse serviço{{/categoria}}.
 
@@ -207,8 +207,8 @@ Se fizer sentido pra você, tenho um horário livre essa semana pra conversarmos
   {
     id: "cobranca_diagnostico_pago",
     label: "Cobrança do diagnóstico (Google e IA)",
-    description: "3º contato ou depois: cobra retorno de quem já recebeu o diagnóstico em texto, sem soar insistente.",
-    appliesTo: ["terceiro_contato", "diagnostico_enviado"],
+    description: "Follow-up pra quem já recebeu o diagnóstico em texto e ainda não respondeu, sem soar insistente.",
+    appliesTo: ["segundo_contato", "terceiro_contato", "diagnostico_enviado"],
     channel: "pago",
     text: withSignature(
       `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}conseguiu ver a análise que te mandei sobre a presença de vocês no Google e nas buscas por IA? Ela mostra bem onde{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} vocês{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} está perdendo pacientes pro concorrente hoje. Posso separar uns 15 minutos essa semana pra te explicar os números com calma e mostrar como resolvemos isso? Se preferir, me chama que já te reenvio a análise.`
