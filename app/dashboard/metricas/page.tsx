@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { isValidSessionToken, SESSION_COOKIE_NAME } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
+import { whatsappChannelForSource } from "@/lib/whatsapp-templates";
 import {
   Lead,
   STATUS_LABELS,
@@ -10,6 +11,31 @@ import {
   PROPOSAL_STATUS_LABELS,
   ProposalStatus,
 } from "@/lib/types";
+import MonthFilter from "./MonthFilter";
+
+/** Formato aceito no parâmetro `?mes=` da URL (ano-mês, igual ao input nativo
+ * `type="month"`). */
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+function currentMonth(): string {
+  return new Date().toISOString().slice(0, 7);
+}
+
+/** Desloca uma string "YYYY-MM" em `delta` meses (positivo ou negativo). */
+function shiftMonth(month: string, delta: number): string {
+  const [year, m] = month.split("-").map(Number);
+  const date = new Date(Date.UTC(year, m - 1 + delta, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthLabel(month: string): string {
+  const label = new Date(`${month}-01T12:00:00Z`).toLocaleDateString("pt-BR", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
 
 function Bar({
   label,
@@ -61,12 +87,20 @@ const PROPOSAL_STATUS_COLORS: Record<ProposalStatus, string> = {
   expirada: "bg-neutral-300",
 };
 
-export default async function MetricasPage() {
+export default async function MetricasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mes?: string }>;
+}) {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   if (!isValidSessionToken(token)) {
     redirect("/login");
   }
+
+  const mesParam = (await searchParams).mes;
+  const selectedMonth = mesParam && MONTH_RE.test(mesParam) ? mesParam : currentMonth();
+  const previousMonth = shiftMonth(selectedMonth, -1);
 
   const supabase = createServiceClient();
   const [{ data: leadsData }, { data: clientsData }, { data: proposalsData }] = await Promise.all([
@@ -94,6 +128,29 @@ export default async function MetricasPage() {
   const contratoAssinadoLeads = leads.filter((l) => l.status === "contrato_assinado");
   const conversionRate =
     decidedLeads.length > 0 ? Math.round((contratoAssinadoLeads.length / decidedLeads.length) * 100) : 0;
+
+  // Tráfego pago por mês: leads de Meta Ads/Trello (mesmo critério de
+  // lib/whatsapp-templates.ts:whatsappChannelForSource), filtrados pelo mês
+  // selecionado no seletor (?mes=YYYY-MM), pra responder "como foi o
+  // desempenho da campanha em tal mês" sem precisar abrir o Kanban inteiro.
+  const paidLeads = leads.filter((l) => whatsappChannelForSource(l.source) === "pago");
+  const paidLeadsInMonth = paidLeads.filter((l) => l.created_at.slice(0, 7) === selectedMonth);
+  const paidLeadsInPreviousMonth = paidLeads.filter(
+    (l) => l.created_at.slice(0, 7) === previousMonth
+  );
+  const totalPago = paidLeadsInMonth.length;
+  const byStatusPago = STATUS_ORDER.map((status) => ({
+    status,
+    count: paidLeadsInMonth.filter((l) => l.status === status).length,
+  }));
+  const decidedLeadsPago = paidLeadsInMonth.filter(
+    (l) => l.status !== "finalizado" && l.status !== "desqualificado"
+  );
+  const contratoAssinadoLeadsPago = paidLeadsInMonth.filter((l) => l.status === "contrato_assinado");
+  const conversionRatePago =
+    decidedLeadsPago.length > 0
+      ? Math.round((contratoAssinadoLeadsPago.length / decidedLeadsPago.length) * 100)
+      : 0;
 
   const mrr = clients
     .filter((c) => c.status === "ativo")
@@ -167,6 +224,52 @@ export default async function MetricasPage() {
                 color={STATUS_COLORS[status] ?? "bg-neutral-400"}
               />
             ))}
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-white p-5 shadow-sm">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-serif text-lg text-neutral-900">Tráfego pago por mês</h2>
+              <p className="text-xs text-neutral-400">
+                Leads de Meta Ads e Trello, filtrados pelo mês em que entraram no CRM
+              </p>
+            </div>
+            <MonthFilter month={selectedMonth} />
+          </div>
+
+          <div className="mb-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-neutral-500">Leads no mês</p>
+              <p className="mt-1 font-serif text-3xl text-neutral-900">{totalPago}</p>
+              <p className="text-[11px] text-neutral-400">
+                {paidLeadsInPreviousMonth.length} no mês anterior
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-neutral-500">Taxa de conversão</p>
+              <p className="mt-1 font-serif text-3xl text-neutral-900">{conversionRatePago}%</p>
+              <p className="text-[11px] text-neutral-400">contrato assinado / (total − finalizado − desqualificado)</p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-neutral-500">Mês selecionado</p>
+              <p className="mt-1 font-serif text-xl capitalize text-neutral-900">{monthLabel(selectedMonth)}</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {byStatusPago.map(({ status, count }) => (
+              <Bar
+                key={status}
+                label={STATUS_LABELS[status]}
+                count={count}
+                total={totalPago}
+                color={STATUS_COLORS[status] ?? "bg-neutral-400"}
+              />
+            ))}
+            {totalPago === 0 && (
+              <p className="text-sm text-neutral-400">Nenhum lead de tráfego pago nesse mês.</p>
+            )}
           </div>
         </div>
 
