@@ -17,11 +17,16 @@ const AUTO_FOLLOWUP_STATUSES: LeadStatus[] = [
 ];
 
 /** Status "de saída" do funil de contato — ao entrar neles não faz mais
- * sentido ter um follow-up pendente agendado, então ele é limpo. */
+ * sentido ter um follow-up pendente agendado, então ele é limpo.
+ * "retornar_depois" entra aqui também: é uma saída do funil ativo (não
+ * fechou, mas também não foi descartado), então o follow-up automático de
+ * 48h não faz sentido; se a equipe já sabe quando quer retomar o contato,
+ * define um novo `next_followup` manualmente na tela do lead. */
 const CLEAR_FOLLOWUP_STATUSES: LeadStatus[] = [
   "finalizado",
   "desqualificado",
   "contrato_assinado",
+  "retornar_depois",
 ];
 
 export interface StatusChangeUpdate {

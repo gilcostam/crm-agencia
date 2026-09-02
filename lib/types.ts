@@ -7,6 +7,7 @@ export type LeadStatus =
   | "no_show"
   | "diagnostico_enviado"
   | "contrato_assinado"
+  | "retornar_depois"
   | "finalizado"
   | "desqualificado";
 
@@ -68,6 +69,7 @@ export const STATUS_LABELS: Record<LeadStatus, string> = {
   no_show: "No Show",
   diagnostico_enviado: "Diagnóstico Enviado",
   contrato_assinado: "Contrato Assinado",
+  retornar_depois: "Retornar Depois",
   finalizado: "Finalizado",
   desqualificado: "Desqualificado",
 };
@@ -81,6 +83,7 @@ export const STATUS_ORDER: LeadStatus[] = [
   "no_show",
   "diagnostico_enviado",
   "contrato_assinado",
+  "retornar_depois",
   "finalizado",
   "desqualificado",
 ];

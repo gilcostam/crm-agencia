@@ -18,6 +18,7 @@ create table if not exists public.leads (
       'no_show',
       'diagnostico_enviado',
       'contrato_assinado',
+      'retornar_depois',
       'finalizado',
       'desqualificado'
     )

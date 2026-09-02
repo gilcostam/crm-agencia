@@ -38,8 +38,10 @@ status):
                            fantasmas via conversão automática do CRM)
     Desqualificado      -> desqualificado
 
-"Contrato Assinado" é um estágio exclusivo do CRM (não existe lista
-correspondente no Trello) — nunca é usado como alvo deste mapeamento.
+"Contrato Assinado" e "Retornar Depois" (adicionado em 2026-09-01, para leads
+que não fecharam mas não foram descartados) são estágios exclusivos do CRM
+(não existe lista correspondente no Trello) — nunca são usados como alvo
+deste mapeamento.
 
 Se o board tiver listas novas que não aparecem no mapa acima, o script cai
 em 'novo_lead' por padrão e avisa no log, pra nunca falhar a importação

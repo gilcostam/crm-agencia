@@ -244,8 +244,8 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
   {
     id: "personalizada",
     label: "Mensagem em branco",
-    description: "Sem modelo. Escreva do zero, usado como padrão fora do funil de contato (Contrato Assinado, Finalizado, Desqualificado).",
-    appliesTo: ["contrato_assinado", "finalizado", "desqualificado"],
+    description: "Sem modelo. Escreva do zero, usado como padrão fora do funil de contato (Contrato Assinado, Retornar Depois, Finalizado, Desqualificado).",
+    appliesTo: ["contrato_assinado", "retornar_depois", "finalizado", "desqualificado"],
     channel: "ambos",
     text: "",
   },

@@ -47,6 +47,7 @@ const STATUS_COLORS: Record<string, string> = {
   no_show: "bg-orange-600",
   diagnostico_enviado: "bg-indigo-500",
   contrato_assinado: "bg-emerald-500",
+  retornar_depois: "bg-teal-600",
   finalizado: "bg-red-500",
   desqualificado: "bg-neutral-400",
 };
