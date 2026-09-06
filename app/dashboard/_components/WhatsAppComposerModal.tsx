@@ -63,6 +63,9 @@ export default function WhatsAppComposerModal({
   const [dirty, setDirty] = useState(false);
   const [copied, setCopied] = useState(false);
   const [logging, setLogging] = useState(false);
+  const [searchingCompetitors, setSearchingCompetitors] = useState(false);
+  const [competitorSearchError, setCompetitorSearchError] = useState<string | null>(null);
+  const [leadProfileNote, setLeadProfileNote] = useState<string | null>(null);
 
   useEffect(() => {
     setConsultor(window.localStorage.getItem(CONSULTANT_NAME_KEY) ?? "");
@@ -75,6 +78,56 @@ export default function WhatsAppComposerModal({
 
   function handleExtraChange(key: string, value: string) {
     setExtraValues((prev) => ({ ...prev, [key]: value }));
+  }
+
+  // Automatiza o preenchimento manual de "concorrente" / "avaliacoes_concorrente"
+  // (usado no modelo de diagnóstico) buscando no Google/Google Maps, via
+  // Serper.dev, quem aparece na frente do lead pra categoria + cidade dele.
+  async function handleSearchCompetitors() {
+    setSearchingCompetitors(true);
+    setCompetitorSearchError(null);
+    setLeadProfileNote(null);
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/competitors`);
+      const data = await res.json();
+      if (!res.ok) {
+        setCompetitorSearchError(data.error ?? "Não foi possível buscar concorrentes.");
+        return;
+      }
+
+      const extras: Record<string, string> = {};
+      if (data.topCompetitorName) {
+        extras.concorrente = data.topCompetitorName;
+        extras.avaliacoes_concorrente = data.topCompetitorRatingText ?? "";
+      } else {
+        setCompetitorSearchError("Nenhum concorrente encontrado pra essa categoria/cidade.");
+      }
+
+      // leadProfile vem da checagem de que o próprio lead tem (ou não) um
+      // perfil encontrável no Google. Não ter perfil não é um erro, é um
+      // achado a favor da venda ("vocês nem aparecem no Google") — por isso
+      // mostra como aviso informativo, não como erro.
+      if (data.leadProfile) {
+        if (data.leadProfile.hasProfile) {
+          extras.avaliacoes = data.leadProfile.reviewCount != null ? String(data.leadProfile.reviewCount) : "";
+          setLeadProfileNote(
+            `Perfil do lead encontrado no Google: ${data.leadProfile.ratingText ?? "sem nota/avaliações"}.`
+          );
+        } else {
+          setLeadProfileNote(
+            "Não encontramos perfil desse lead no Google (Maps/Perfil da Empresa). Pode valer usar isso na conversa: \"vocês nem aparecem no Google ainda\"."
+          );
+        }
+      }
+
+      if (Object.keys(extras).length > 0) {
+        setExtraValues((prev) => ({ ...prev, ...extras }));
+      }
+    } catch {
+      setCompetitorSearchError("Erro de conexão ao buscar concorrentes.");
+    } finally {
+      setSearchingCompetitors(false);
+    }
   }
 
   const template = getTemplate(templateId);
@@ -200,6 +253,26 @@ export default function WhatsAppComposerModal({
             </label>
           ))}
         </div>
+
+        {(extraKeysForTemplate.includes("concorrente") ||
+          extraKeysForTemplate.includes("avaliacoes_concorrente")) && (
+          <div className="mb-3">
+            <button
+              type="button"
+              onClick={handleSearchCompetitors}
+              disabled={searchingCompetitors}
+              className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+            >
+              {searchingCompetitors ? "Buscando concorrentes..." : "Buscar concorrentes no Google"}
+            </button>
+            {competitorSearchError && (
+              <p className="mt-1 text-[11px] text-amber-700">{competitorSearchError}</p>
+            )}
+            {leadProfileNote && (
+              <p className="mt-1 text-[11px] text-sky-700">{leadProfileNote}</p>
+            )}
+          </div>
+        )}
 
         {rendered.missing.length > 0 && (
           <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
