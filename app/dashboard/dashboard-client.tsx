@@ -3,12 +3,15 @@
 import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
+  FOLLOWUP_URGENCY_LABELS,
+  FollowupUrgency,
   Lead,
   LeadAttachment,
   LeadEvent,
   LeadStatus,
   STATUS_LABELS,
   STATUS_ORDER,
+  followupUrgency,
 } from "@/lib/types";
 import { sanitizePhone } from "@/lib/phone";
 import WhatsAppComposerModal from "./_components/WhatsAppComposerModal";
@@ -64,6 +67,20 @@ function isToday(iso: string): boolean {
     d.getDate() === now.getDate()
   );
 }
+
+/** Data de hoje em "yyyy-mm-dd" (fuso local), mesmo formato de
+ * `lead.next_followup` — usado pra classificar a urgência do follow-up (ver
+ * followupUrgency em lib/types.ts) sem depender de fuso-horário. */
+function todayISODate(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+const FOLLOWUP_BADGE_STYLES: Record<FollowupUrgency, string> = {
+  on_time: "bg-emerald-100 text-emerald-700",
+  due_today: "bg-yellow-100 text-yellow-800",
+  overdue: "bg-red-100 text-red-700",
+};
 
 function formatBytes(bytes: number | null | undefined): string {
   if (!bytes) return "";
@@ -918,6 +935,7 @@ export default function DashboardClient({
   const [composerLeadId, setComposerLeadId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
+  const [followupFilter, setFollowupFilter] = useState<"all" | FollowupUrgency>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [dragOverStatus, setDragOverStatus] = useState<LeadStatus | null>(null);
@@ -1194,10 +1212,19 @@ export default function DashboardClient({
     return d.getTime();
   }, [dateTo]);
 
+  // Recalculado a cada render (não por useMemo): é uma string barata de
+  // montar, e precisa acompanhar o dia real mesmo se a aba do CRM ficar
+  // aberta passando da meia-noite (o polling de 4s já força re-render com
+  // frequência de sobra pra isso acontecer sem esperar F5).
+  const today = todayISODate();
+
   const filteredLeads = useMemo(() => {
     const q = search.trim().toLowerCase();
     return leads.filter((l) => {
       if (sourceFilter !== "all" && l.source !== sourceFilter) return false;
+      if (followupFilter !== "all" && followupUrgency(l.next_followup, today) !== followupFilter) {
+        return false;
+      }
       if (dateFromMs !== null || dateToMs !== null) {
         const createdMs = new Date(l.created_at).getTime();
         if (dateFromMs !== null && createdMs < dateFromMs) return false;
@@ -1210,7 +1237,7 @@ export default function DashboardClient({
         .toLowerCase();
       return haystack.includes(q);
     });
-  }, [leads, search, sourceFilter, dateFromMs, dateToMs]);
+  }, [leads, search, sourceFilter, followupFilter, today, dateFromMs, dateToMs]);
 
   // Agrupa leads pelo telefone normalizado, pra sinalizar possíveis duplicatas.
   const phoneGroups = useMemo(() => {
@@ -1456,6 +1483,16 @@ export default function DashboardClient({
               </option>
             ))}
           </select>
+          <select
+            value={followupFilter}
+            onChange={(e) => setFollowupFilter(e.target.value as "all" | FollowupUrgency)}
+            className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700"
+          >
+            <option value="all">Todos os follow-ups</option>
+            <option value="on_time">{FOLLOWUP_URGENCY_LABELS.on_time}</option>
+            <option value="due_today">{FOLLOWUP_URGENCY_LABELS.due_today}</option>
+            <option value="overdue">{FOLLOWUP_URGENCY_LABELS.overdue}</option>
+          </select>
           <div className="flex items-center gap-1.5">
             <label className="text-xs text-neutral-500" htmlFor="date-from">
               De
@@ -1522,7 +1559,7 @@ export default function DashboardClient({
           >
             + Novo lead
           </button>
-          {(search || sourceFilter !== "all" || dateFrom || dateTo) && (
+          {(search || sourceFilter !== "all" || followupFilter !== "all" || dateFrom || dateTo) && (
             <span className="text-xs text-neutral-400">
               {filteredLeads.length} de {leads.length} leads
             </span>
@@ -1682,11 +1719,23 @@ export default function DashboardClient({
                               Reunião {formatDate(lead.meeting_datetime)}
                             </span>
                           )}
-                          {lead.next_followup && (
-                            <span className="inline-block rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
-                              Follow-up {new Date(`${lead.next_followup}T00:00:00`).toLocaleDateString("pt-BR")}
-                            </span>
-                          )}
+                          {lead.next_followup && (() => {
+                            const urgency = followupUrgency(lead.next_followup, today) ?? "on_time";
+                            const formattedDate = new Date(`${lead.next_followup}T00:00:00`).toLocaleDateString("pt-BR");
+                            const label =
+                              urgency === "due_today"
+                                ? "Follow-up hoje"
+                                : urgency === "overdue"
+                                ? `Atrasado desde ${formattedDate}`
+                                : `Follow-up ${formattedDate}`;
+                            return (
+                              <span
+                                className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${FOLLOWUP_BADGE_STYLES[urgency]}`}
+                              >
+                                {label}
+                              </span>
+                            );
+                          })()}
                           {stale && (
                             <span className="inline-block rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-700">
                               Sem contato há {daysSince(lead.updated_at)}d

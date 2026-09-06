@@ -123,7 +123,11 @@ export async function POST(request: NextRequest) {
       .eq("type", "whatsapp_sent");
 
     if ((count ?? 0) <= 1) {
-      const statusUpdate = buildStatusChangeUpdate(leadStatusDates, "primeiro_contato");
+      // sameDayFollowup: o 1º contato aqui foi automático (bot) — o 2º
+      // contato (humano) precisa acontecer ainda hoje, não em 48h.
+      const statusUpdate = buildStatusChangeUpdate(leadStatusDates, "primeiro_contato", {
+        sameDayFollowup: true,
+      });
       const { error: updateError } = await supabase
         .from("leads")
         .update({
@@ -148,7 +152,7 @@ export async function POST(request: NextRequest) {
           events.push({
             lead_id: leadId,
             type: "note",
-            message: `Follow-up automático agendado para ${new Date(`${statusUpdate.next_followup}T00:00:00`).toLocaleDateString("pt-BR")} (48h após este contato)`,
+            message: `2º contato (follow-up humano) precisa ser feito ainda hoje, ${new Date(`${statusUpdate.next_followup}T00:00:00`).toLocaleDateString("pt-BR")} — mesmo dia da mensagem automática de boas-vindas.`,
           });
         }
         const { error: statusEventError } = await supabase.from("lead_events").insert(events);

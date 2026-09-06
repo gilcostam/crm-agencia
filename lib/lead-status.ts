@@ -60,7 +60,7 @@ function normalizeStatusDates(value: unknown): Partial<Record<LeadStatus, string
 export function buildStatusChangeUpdate(
   previousStatusDates: unknown,
   newStatus: LeadStatus,
-  options: { explicitNextFollowup?: boolean } = {}
+  options: { explicitNextFollowup?: boolean; sameDayFollowup?: boolean } = {}
 ): StatusChangeUpdate {
   const nowIso = new Date().toISOString();
   const status_dates = { ...normalizeStatusDates(previousStatusDates), [newStatus]: nowIso };
@@ -70,7 +70,13 @@ export function buildStatusChangeUpdate(
   if (!options.explicitNextFollowup) {
     if (AUTO_FOLLOWUP_STATUSES.includes(newStatus)) {
       const followup = new Date();
-      followup.setUTCDate(followup.getUTCDate() + 2); // 48h, em termos de data (next_followup é `date`)
+      // `sameDayFollowup`: caso especial do 1º contato automático (mensagem
+      // disparada assim que o lead chega via Meta Ads/Trello, ver
+      // app/api/webhook/whatsapp/route.ts) — o 2º contato (humano) precisa
+      // acontecer no mesmo dia, não 48h depois, já que quem "gastou" o 1º
+      // contato foi o bot, não a equipe.
+      const daysAhead = options.sameDayFollowup ? 0 : 2;
+      followup.setUTCDate(followup.getUTCDate() + daysAhead); // 48h, em termos de data (next_followup é `date`)
       update.next_followup = followup.toISOString().slice(0, 10);
     } else if (CLEAR_FOLLOWUP_STATUSES.includes(newStatus)) {
       update.next_followup = null;

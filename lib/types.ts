@@ -88,6 +88,36 @@ export const STATUS_ORDER: LeadStatus[] = [
   "desqualificado",
 ];
 
+export type FollowupUrgency = "on_time" | "due_today" | "overdue";
+
+export const FOLLOWUP_URGENCY_LABELS: Record<FollowupUrgency, string> = {
+  on_time: "No prazo",
+  due_today: "Follow-up hoje",
+  overdue: "Atrasado",
+};
+
+/** Classifica a urgência do próximo follow-up de um lead (`next_followup`)
+ * pra exibição (badge verde/amarelo/vermelho no Kanban) e pros filtros de
+ * follow-up do dashboard: "on_time" (verde, ainda não venceu — inclui o
+ * próprio dia em que o contato foi feito, já que o próximo follow-up nesse
+ * momento é sempre uma data futura), "due_today" (amarelo, vence hoje) e
+ * "overdue" (vermelho, já passou da data). `todayISODate` deve ser uma
+ * string "yyyy-mm-dd" (mesmo formato de `next_followup`), pra comparação
+ * lexicográfica direta sem depender de fuso-horário (mesmo padrão de
+ * `contractUrgency` abaixo). Retorna `null` quando não há follow-up
+ * agendado (lead que ainda não recebeu nenhum contato registrado, ou está
+ * em status de saída do funil — ver CLEAR_FOLLOWUP_STATUSES em
+ * lib/lead-status.ts). */
+export function followupUrgency(
+  nextFollowup: string | null,
+  todayISODate: string
+): FollowupUrgency | null {
+  if (!nextFollowup) return null;
+  if (nextFollowup < todayISODate) return "overdue";
+  if (nextFollowup === todayISODate) return "due_today";
+  return "on_time";
+}
+
 export interface LeadEvent {
   id: string;
   lead_id: string;
