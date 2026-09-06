@@ -66,6 +66,9 @@ export default function WhatsAppComposerModal({
   const [searchingCompetitors, setSearchingCompetitors] = useState(false);
   const [competitorSearchError, setCompetitorSearchError] = useState<string | null>(null);
   const [leadProfileNote, setLeadProfileNote] = useState<string | null>(null);
+  const [competitorsFound, setCompetitorsFound] = useState<
+    Array<{ name: string; ratingText: string | null }>
+  >([]);
 
   useEffect(() => {
     setConsultor(window.localStorage.getItem(CONSULTANT_NAME_KEY) ?? "");
@@ -83,10 +86,15 @@ export default function WhatsAppComposerModal({
   // Automatiza o preenchimento manual de "concorrente" / "avaliacoes_concorrente"
   // (usado no modelo de diagnóstico) buscando no Google/Google Maps, via
   // Serper.dev, quem aparece na frente do lead pra categoria + cidade dele.
+  // O botão fica visível pra qualquer lead/modelo (não só o de diagnóstico):
+  // os campos extras só aparecem no formulário quando o modelo selecionado
+  // os usa, mas o resultado da busca em si (lista de concorrentes, perfil do
+  // lead no Google) é útil independentemente do modelo escolhido.
   async function handleSearchCompetitors() {
     setSearchingCompetitors(true);
     setCompetitorSearchError(null);
     setLeadProfileNote(null);
+    setCompetitorsFound([]);
     try {
       const res = await fetch(`/api/leads/${lead.id}/competitors`);
       const data = await res.json();
@@ -101,6 +109,20 @@ export default function WhatsAppComposerModal({
         extras.avaliacoes_concorrente = data.topCompetitorRatingText ?? "";
       } else {
         setCompetitorSearchError("Nenhum concorrente encontrado pra essa categoria/cidade.");
+      }
+
+      if (Array.isArray(data.competitors)) {
+        setCompetitorsFound(
+          data.competitors.map((c: { name: string; rating: number | null; reviewCount: number | null }) => ({
+            name: c.name,
+            ratingText:
+              c.rating != null
+                ? `${c.rating.toFixed(1).replace(".", ",")} estrelas${
+                    c.reviewCount != null ? ` (${c.reviewCount} avaliações)` : ""
+                  }`
+                : null,
+          }))
+        );
       }
 
       // leadProfile vem da checagem de que o próprio lead tem (ou não) um
@@ -254,25 +276,45 @@ export default function WhatsAppComposerModal({
           ))}
         </div>
 
-        {(extraKeysForTemplate.includes("concorrente") ||
-          extraKeysForTemplate.includes("avaliacoes_concorrente")) && (
-          <div className="mb-3">
-            <button
-              type="button"
-              onClick={handleSearchCompetitors}
-              disabled={searchingCompetitors}
-              className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
-            >
-              {searchingCompetitors ? "Buscando concorrentes..." : "Buscar concorrentes no Google"}
-            </button>
-            {competitorSearchError && (
-              <p className="mt-1 text-[11px] text-amber-700">{competitorSearchError}</p>
-            )}
-            {leadProfileNote && (
-              <p className="mt-1 text-[11px] text-sky-700">{leadProfileNote}</p>
-            )}
-          </div>
-        )}
+        <div className="mb-3 rounded-md border border-neutral-200 bg-neutral-50 p-2.5">
+          <button
+            type="button"
+            onClick={handleSearchCompetitors}
+            disabled={searchingCompetitors || !lead.category || !lead.city}
+            className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100 disabled:opacity-50"
+          >
+            {searchingCompetitors ? "Buscando concorrentes..." : "Buscar concorrentes no Google"}
+          </button>
+          {(!lead.category || !lead.city) && (
+            <p className="mt-1 text-[11px] text-neutral-400">
+              Cadastre categoria e cidade do lead pra usar essa busca.
+            </p>
+          )}
+          {extraKeysForTemplate.includes("concorrente") ||
+          extraKeysForTemplate.includes("avaliacoes_concorrente") ? (
+            <p className="mt-1 text-[11px] text-neutral-400">
+              Preenche automaticamente os campos de concorrente acima quando encontrar resultado.
+            </p>
+          ) : (
+            <p className="mt-1 text-[11px] text-neutral-400">
+              O modelo atual não usa esses dados na mensagem, mas o resultado aparece abaixo mesmo assim.
+            </p>
+          )}
+          {competitorSearchError && (
+            <p className="mt-1 text-[11px] text-amber-700">{competitorSearchError}</p>
+          )}
+          {leadProfileNote && <p className="mt-1 text-[11px] text-sky-700">{leadProfileNote}</p>}
+          {competitorsFound.length > 0 && (
+            <ul className="mt-2 space-y-0.5 text-[11px] text-neutral-600">
+              {competitorsFound.map((c, i) => (
+                <li key={`${c.name}-${i}`}>
+                  {i + 1}. {c.name}
+                  {c.ratingText ? ` (${c.ratingText})` : ""}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {rendered.missing.length > 0 && (
           <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
