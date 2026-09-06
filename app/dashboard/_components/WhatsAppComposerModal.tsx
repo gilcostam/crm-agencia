@@ -67,6 +67,15 @@ export default function WhatsAppComposerModal({
   // os dados do lead/extras mudam).
   const [blockTexts, setBlockTexts] = useState<string[]>([]);
   const [blockDirty, setBlockDirty] = useState<boolean[]>([]);
+  // "Assistente" de envio sequencial: só o bloco de índice `assistantStep`
+  // pode ser aberto no WhatsApp; depois de aberto, os próximos ficam
+  // bloqueados por `assistantCountdown` segundos (pausa simulando digitação
+  // natural, em vez de mandar tudo de uma vez ou depender de copiar/colar
+  // manualmente cada bloco). O WhatsApp em si não expõe nenhuma API pra um
+  // site clicar "Enviar" sozinho dentro dele — por isso ainda é 1 clique por
+  // bloco, só que guiado e no ritmo certo.
+  const [assistantStep, setAssistantStep] = useState(0);
+  const [assistantCountdown, setAssistantCountdown] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [copiedBlock, setCopiedBlock] = useState<number | null>(null);
   const [logging, setLogging] = useState(false);
@@ -206,8 +215,29 @@ export default function WhatsAppComposerModal({
 
   useEffect(() => {
     setBlockDirty(new Array(renderedBlocks.blocks.length).fill(false));
+    setAssistantStep(0);
+    setAssistantCountdown(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateId]);
+
+  // Trava de segurança: se a quantidade de blocos encolher (ex.: extras
+  // preenchidos depois de já ter avançado no assistente), evita ficar com
+  // `assistantStep` apontando pra um índice que não existe mais.
+  useEffect(() => {
+    setAssistantStep((prev) => Math.min(prev, blockTexts.length));
+  }, [blockTexts.length]);
+
+  // Contagem regressiva do assistente: decrementa a cada 1s até liberar o
+  // próximo bloco pra abrir no WhatsApp.
+  useEffect(() => {
+    if (assistantCountdown === null) return;
+    if (assistantCountdown <= 0) {
+      setAssistantCountdown(null);
+      return;
+    }
+    const timer = setTimeout(() => setAssistantCountdown((c) => (c !== null ? c - 1 : null)), 1000);
+    return () => clearTimeout(timer);
+  }, [assistantCountdown]);
 
   async function logEvent(finalText: string) {
     setLogging(true);
@@ -230,17 +260,39 @@ export default function WhatsAppComposerModal({
     }
   }
 
-  // Abre o WhatsApp já com o 1º bloco preenchido (wa.me só aceita um texto
-  // pré-preenchido por link) — os blocos seguintes (quando existem, ver
-  // renderWhatsappBlocks) ficam pra colar um a um manualmente, com uma pausa
-  // natural entre eles, em vez de mandar tudo de uma vez como um bloco só.
-  // O evento registrado na timeline usa a mensagem completa (todos os
-  // blocos), pra manter o histórico fiel ao que de fato foi combinado.
-  function handleOpenWhatsapp() {
+  // Abre o WhatsApp já com o bloco de índice `index` preenchido (wa.me só
+  // aceita um texto pré-preenchido por link). Quando há mais de um bloco,
+  // avança o assistente pro próximo (com uma contagem regressiva de 7s antes
+  // de liberá-lo), em vez de deixar todos abertos ao mesmo tempo — assim a
+  // sequência chega no WhatsApp do lead com uma pausa natural entre
+  // mensagens, sem precisar copiar/colar manualmente. O evento registrado na
+  // timeline (só no 1º bloco) usa a mensagem completa (todos os blocos), pra
+  // manter o histórico fiel ao que de fato foi combinado.
+  function handleOpenBlock(index: number) {
     if (!digits) return;
-    const firstBlock = blockTexts[0] ?? "";
-    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(firstBlock)}`, "_blank", "noopener,noreferrer");
-    logEvent(blockTexts.join("\n\n"));
+    const text = blockTexts[index] ?? "";
+    if (!text) return;
+    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+    if (index === 0) {
+      logEvent(blockTexts.join("\n\n"));
+    }
+    if (blockTexts.length > 1) {
+      const next = index + 1;
+      setAssistantStep(next);
+      setAssistantCountdown(next < blockTexts.length ? 7 : null);
+    }
+  }
+
+  function handleOpenWhatsapp() {
+    handleOpenBlock(blockTexts.length > 1 ? assistantStep : 0);
+  }
+
+  function blockButtonLabel(index: number): string {
+    if (index < assistantStep) return "Já aberto no WhatsApp";
+    if (index === assistantStep) {
+      return assistantCountdown !== null ? `Aguarde ${assistantCountdown}s...` : "Abrir WhatsApp com este bloco";
+    }
+    return "Aguardando bloco anterior";
   }
 
   async function handleCopy() {
@@ -395,9 +447,11 @@ export default function WhatsAppComposerModal({
         {blockTexts.length > 1 ? (
           <div className="mb-3 space-y-2">
             <p className="text-[11px] text-neutral-500">
-              Mensagem dividida em {blockTexts.length} blocos. Copie e mande cada um como uma mensagem separada
-              no WhatsApp, com uma pequena pausa entre eles, pra soar como uma conversa normal em vez de um
-              texto único gigante (e não parecer bot).
+              Mensagem dividida em {blockTexts.length} blocos. Clique em &quot;Abrir WhatsApp com este bloco&quot;
+              bloco por bloco: a gente libera o próximo automaticamente depois de ~7s, simulando uma pausa
+              natural de digitação (o WhatsApp não deixa um site mandar sozinho, então ainda é 1 clique por
+              bloco — só que no ritmo certo). Se preferir, também dá pra copiar e colar manualmente a qualquer
+              momento.
             </p>
             {blockTexts.map((blockText, i) => (
               <div key={i} className="rounded-md border border-neutral-200 p-2">
@@ -429,16 +483,14 @@ export default function WhatsAppComposerModal({
                   >
                     {copiedBlock === i ? "Copiado!" : "Copiar este bloco"}
                   </button>
-                  {i === 0 && (
-                    <button
-                      type="button"
-                      disabled={!digits || logging}
-                      onClick={handleOpenWhatsapp}
-                      className="text-[10px] font-medium text-emerald-700 underline decoration-dotted hover:text-emerald-900 disabled:opacity-50"
-                    >
-                      Abrir WhatsApp com este bloco
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    disabled={!digits || logging || i !== assistantStep || assistantCountdown !== null}
+                    onClick={() => handleOpenBlock(i)}
+                    className="text-[10px] font-medium text-emerald-700 underline decoration-dotted hover:text-emerald-900 disabled:opacity-40"
+                  >
+                    {blockButtonLabel(i)}
+                  </button>
                 </div>
               </div>
             ))}
@@ -466,11 +518,21 @@ export default function WhatsAppComposerModal({
         <div className="mb-4 flex flex-wrap gap-2">
           <button
             type="button"
-            disabled={!digits || logging}
+            disabled={
+              !digits ||
+              logging ||
+              (blockTexts.length > 1 && (assistantCountdown !== null || assistantStep >= blockTexts.length))
+            }
             onClick={handleOpenWhatsapp}
             className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600 disabled:opacity-50"
           >
-            Abrir WhatsApp
+            {blockTexts.length > 1
+              ? assistantStep >= blockTexts.length
+                ? "Sequência concluída"
+                : assistantCountdown !== null
+                ? `Aguarde ${assistantCountdown}s...`
+                : `Abrir WhatsApp (bloco ${assistantStep + 1})`
+              : "Abrir WhatsApp"}
           </button>
           <button
             type="button"
