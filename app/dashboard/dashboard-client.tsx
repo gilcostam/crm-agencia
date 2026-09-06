@@ -1231,6 +1231,82 @@ export default function DashboardClient({
     return (phoneGroups.get(key) ?? []).filter((d) => d.id !== lead.id);
   }
 
+  // Busca de concorrentes direto no card do lead (coluna "Novo Lead"), sem
+  // precisar abrir o composer de WhatsApp. Mesmo endpoint usado lá
+  // (GET /api/leads/[id]/competitors, ver lib/serper.ts), só que aqui o
+  // resultado só é exibido de forma compacta no próprio card — não alimenta
+  // nenhum campo de modelo de mensagem (isso continua exclusivo do
+  // WhatsAppComposerModal).
+  const [competitorPanels, setCompetitorPanels] = useState<
+    Record<
+      string,
+      {
+        searching: boolean;
+        error: string | null;
+        topName: string | null;
+        topRating: string | null;
+        hasProfile: boolean | null;
+        profileNote: string | null;
+      }
+    >
+  >({});
+
+  async function searchCompetitorsForLead(lead: Lead) {
+    setCompetitorPanels((prev) => ({
+      ...prev,
+      [lead.id]: { searching: true, error: null, topName: null, topRating: null, hasProfile: null, profileNote: null },
+    }));
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/competitors`);
+      const data = await res.json();
+      if (!res.ok) {
+        setCompetitorPanels((prev) => ({
+          ...prev,
+          [lead.id]: {
+            searching: false,
+            error: data.error ?? "Não foi possível buscar concorrentes.",
+            topName: null,
+            topRating: null,
+            hasProfile: null,
+            profileNote: null,
+          },
+        }));
+        return;
+      }
+
+      const hasProfile: boolean | null = data.leadProfile ? Boolean(data.leadProfile.hasProfile) : null;
+      const profileNote: string | null = data.leadProfile
+        ? data.leadProfile.hasProfile
+          ? `Perfil no Google: ${data.leadProfile.ratingText ?? "sem nota/avaliações"}`
+          : "Sem perfil no Google ainda"
+        : null;
+
+      setCompetitorPanels((prev) => ({
+        ...prev,
+        [lead.id]: {
+          searching: false,
+          error: data.topCompetitorName ? null : "Nenhum concorrente encontrado pra essa categoria/cidade.",
+          topName: data.topCompetitorName ?? null,
+          topRating: data.topCompetitorRatingText ?? null,
+          hasProfile,
+          profileNote,
+        },
+      }));
+    } catch {
+      setCompetitorPanels((prev) => ({
+        ...prev,
+        [lead.id]: {
+          searching: false,
+          error: "Erro de conexão ao buscar concorrentes.",
+          topName: null,
+          topRating: null,
+          hasProfile: null,
+          profileNote: null,
+        },
+      }));
+    }
+  }
+
   // Lembrete visível de reuniões marcadas pra hoje, ordenadas por horário —
   // não depende de permissão de notificação do navegador.
   const todaysMeetings = useMemo(() => {
@@ -1525,6 +1601,47 @@ export default function DashboardClient({
                             {lead.city}
                             {lead.category ? ` · ${lead.category}` : ""}
                           </p>
+                        )}
+                        {lead.status === "novo_lead" && lead.category && lead.city && (
+                          <div className="mt-1.5 border-t border-neutral-200 pt-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                searchCompetitorsForLead(lead);
+                              }}
+                              disabled={competitorPanels[lead.id]?.searching}
+                              className="text-[10px] font-medium text-sky-700 underline decoration-dotted hover:text-sky-900 disabled:opacity-50"
+                            >
+                              {competitorPanels[lead.id]?.searching
+                                ? "Buscando concorrentes..."
+                                : "Buscar concorrentes no Google"}
+                            </button>
+                            {competitorPanels[lead.id]?.error && (
+                              <p className="mt-0.5 text-[10px] text-amber-700">
+                                {competitorPanels[lead.id]?.error}
+                              </p>
+                            )}
+                            {competitorPanels[lead.id]?.topName && (
+                              <p className="mt-0.5 text-[10px] text-neutral-600">
+                                À frente: <strong>{competitorPanels[lead.id]?.topName}</strong>
+                                {competitorPanels[lead.id]?.topRating
+                                  ? ` (${competitorPanels[lead.id]?.topRating})`
+                                  : ""}
+                              </p>
+                            )}
+                            {competitorPanels[lead.id]?.profileNote && (
+                              <p
+                                className={`mt-0.5 text-[10px] ${
+                                  competitorPanels[lead.id]?.hasProfile
+                                    ? "text-neutral-500"
+                                    : "font-medium text-red-600"
+                                }`}
+                              >
+                                {competitorPanels[lead.id]?.profileNote}
+                              </p>
+                            )}
+                          </div>
                         )}
                         <p className="mt-1 text-[10px] uppercase tracking-wide text-neutral-400">
                           {lead.source} · {formatDate(lead.created_at)}
