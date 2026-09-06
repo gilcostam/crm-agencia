@@ -51,6 +51,11 @@ export type LeadProfileCheckResult =
       rating: number | null;
       reviewCount: number | null;
       ratingText: string | null;
+      /** Se o perfil do Google do lead lista um site. Quando não há perfil
+       * encontrado (`hasProfile: false`), fica `false` por falta de sinal
+       * (não necessariamente significa que o negócio não tem site nenhum,
+       * só que não achamos evidência de um via o perfil do Google). */
+      hasWebsite: boolean;
     }
   | CompetitorSearchError;
 
@@ -60,6 +65,7 @@ type SerperPlaceResult = {
   ratingCount?: number;
   address?: string;
   position?: number;
+  website?: string;
 };
 
 type SerperPlacesResponse = {
@@ -220,7 +226,7 @@ export async function checkLeadGoogleProfile(
 
   const match = places.find((place) => place.title && namesMatch(place.title, trimmedName));
   if (!match) {
-    return { ok: true, hasProfile: false, rating: null, reviewCount: null, ratingText: null };
+    return { ok: true, hasProfile: false, rating: null, reviewCount: null, ratingText: null, hasWebsite: false };
   }
 
   const rating = typeof match.rating === "number" ? match.rating : null;
@@ -232,5 +238,6 @@ export async function checkLeadGoogleProfile(
     rating,
     reviewCount,
     ratingText: formatRatingText(rating, reviewCount),
+    hasWebsite: Boolean(match.website && match.website.trim()),
   };
 }

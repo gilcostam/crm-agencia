@@ -1247,6 +1247,7 @@ export default function DashboardClient({
         topRating: string | null;
         hasProfile: boolean | null;
         profileNote: string | null;
+        siteNote: string | null;
       }
     >
   >({});
@@ -1254,7 +1255,15 @@ export default function DashboardClient({
   async function searchCompetitorsForLead(lead: Lead) {
     setCompetitorPanels((prev) => ({
       ...prev,
-      [lead.id]: { searching: true, error: null, topName: null, topRating: null, hasProfile: null, profileNote: null },
+      [lead.id]: {
+        searching: true,
+        error: null,
+        topName: null,
+        topRating: null,
+        hasProfile: null,
+        profileNote: null,
+        siteNote: null,
+      },
     }));
     try {
       const res = await fetch(`/api/leads/${lead.id}/competitors`);
@@ -1269,17 +1278,26 @@ export default function DashboardClient({
             topRating: null,
             hasProfile: null,
             profileNote: null,
+            siteNote: null,
           },
         }));
         return;
       }
 
+      // Tom positivo quando o lead já tem perfil (só falta otimizar), e
+      // aviso genérico (sem revelar o quê) quando falta perfil ou site —
+      // mesmo padrão de linguagem usado no composer de WhatsApp, pensado
+      // pra gerar curiosidade em vez de soar como crítica.
       const hasProfile: boolean | null = data.leadProfile ? Boolean(data.leadProfile.hasProfile) : null;
       const profileNote: string | null = data.leadProfile
         ? data.leadProfile.hasProfile
-          ? `Perfil no Google: ${data.leadProfile.ratingText ?? "sem nota/avaliações"}`
-          : "Sem perfil no Google ainda"
+          ? `✅ Já tem perfil no Google (${data.leadProfile.ratingText ?? "sem nota/avaliações"}) — já tem a base pra ranquear, falta otimizar.`
+          : "⚠️ Ponto de atenção: sem perfil no Google ainda."
         : null;
+      const siteNote: string | null =
+        data.leadProfile && data.leadProfile.hasWebsite === false
+          ? "⚠️ Ponto de atenção: não encontramos site."
+          : null;
 
       setCompetitorPanels((prev) => ({
         ...prev,
@@ -1290,6 +1308,7 @@ export default function DashboardClient({
           topRating: data.topCompetitorRatingText ?? null,
           hasProfile,
           profileNote,
+          siteNote,
         },
       }));
     } catch {
@@ -1302,6 +1321,7 @@ export default function DashboardClient({
           topRating: null,
           hasProfile: null,
           profileNote: null,
+          siteNote: null,
         },
       }));
     }
@@ -1634,11 +1654,16 @@ export default function DashboardClient({
                               <p
                                 className={`mt-0.5 text-[10px] ${
                                   competitorPanels[lead.id]?.hasProfile
-                                    ? "text-neutral-500"
-                                    : "font-medium text-red-600"
+                                    ? "font-medium text-emerald-700"
+                                    : "font-medium text-amber-700"
                                 }`}
                               >
                                 {competitorPanels[lead.id]?.profileNote}
+                              </p>
+                            )}
+                            {competitorPanels[lead.id]?.siteNote && (
+                              <p className="mt-0.5 text-[10px] font-medium text-amber-700">
+                                {competitorPanels[lead.id]?.siteNote}
                               </p>
                             )}
                           </div>

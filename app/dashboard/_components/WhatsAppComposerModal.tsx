@@ -10,7 +10,7 @@ import {
   fieldLabel,
   getTemplate,
   getTemplatesForChannel,
-  renderWhatsappTemplate,
+  renderWhatsappBlocks,
   templateUsesVar,
   whatsappChannelForSource,
 } from "@/lib/whatsapp-templates";
@@ -59,13 +59,21 @@ export default function WhatsAppComposerModal({
   const [consultor, setConsultor] = useState("");
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
   const [templateId, setTemplateId] = useState(() => defaultTemplateIdForStatus(lead.status, channel));
-  const [text, setText] = useState("");
-  const [dirty, setDirty] = useState(false);
+  // Mensagem representada como uma lista de blocos (ver renderWhatsappBlocks
+  // em lib/whatsapp-templates.ts). Pra modelos sem `blocks` (a maioria), essa
+  // lista sempre tem 1 item só, e a UI se comporta exatamente como antes (uma
+  // única textarea). `blockDirty` espelha `blockTexts` pra saber quais blocos
+  // o vendedor já editou à mão (e por isso não devem ser sobrescritos quando
+  // os dados do lead/extras mudam).
+  const [blockTexts, setBlockTexts] = useState<string[]>([]);
+  const [blockDirty, setBlockDirty] = useState<boolean[]>([]);
   const [copied, setCopied] = useState(false);
+  const [copiedBlock, setCopiedBlock] = useState<number | null>(null);
   const [logging, setLogging] = useState(false);
   const [searchingCompetitors, setSearchingCompetitors] = useState(false);
   const [competitorSearchError, setCompetitorSearchError] = useState<string | null>(null);
   const [leadProfileNote, setLeadProfileNote] = useState<string | null>(null);
+  const [leadSiteNote, setLeadSiteNote] = useState<string | null>(null);
   const [competitorsFound, setCompetitorsFound] = useState<
     Array<{ name: string; ratingText: string | null }>
   >([]);
@@ -94,6 +102,7 @@ export default function WhatsAppComposerModal({
     setSearchingCompetitors(true);
     setCompetitorSearchError(null);
     setLeadProfileNote(null);
+    setLeadSiteNote(null);
     setCompetitorsFound([]);
     try {
       const res = await fetch(`/api/leads/${lead.id}/competitors`);
@@ -126,18 +135,32 @@ export default function WhatsAppComposerModal({
       }
 
       // leadProfile vem da checagem de que o próprio lead tem (ou não) um
-      // perfil encontrável no Google. Não ter perfil não é um erro, é um
-      // achado a favor da venda ("vocês nem aparecem no Google") — por isso
-      // mostra como aviso informativo, não como erro.
+      // perfil encontrável no Google, e se esse perfil lista um site.
+      // `tem_perfil`/`tem_site` alimentam o modelo de diagnóstico em blocos
+      // (ver DIAGNOSTICO_IA_BLOCKS em lib/whatsapp-templates.ts): quando
+      // ausentes, o bloco correspondente na mensagem vira um alerta genérico
+      // (sem revelar qual é o problema) em vez de citar o dado direto — não
+      // ter perfil/site não é um erro, é um achado a favor da venda.
       if (data.leadProfile) {
         if (data.leadProfile.hasProfile) {
           extras.avaliacoes = data.leadProfile.reviewCount != null ? String(data.leadProfile.reviewCount) : "";
+          extras.tem_perfil = "sim";
           setLeadProfileNote(
-            `Perfil do lead encontrado no Google: ${data.leadProfile.ratingText ?? "sem nota/avaliações"}.`
+            `Perfil do lead encontrado no Google: ${
+              data.leadProfile.ratingText ?? "sem nota/avaliações"
+            }. Já tem base pra ranquear, falta otimizar (mensagem vai parabenizar em vez de criticar).`
           );
         } else {
           setLeadProfileNote(
-            "Não encontramos perfil desse lead no Google (Maps/Perfil da Empresa). Pode valer usar isso na conversa: \"vocês nem aparecem no Google ainda\"."
+            "Não encontramos perfil desse lead no Google (Maps/Perfil da Empresa). A mensagem vai citar isso como um ponto de atenção genérico, sem revelar o quê, pra despertar curiosidade sobre a reunião."
+          );
+        }
+
+        if (data.leadProfile.hasWebsite) {
+          extras.tem_site = "sim";
+        } else {
+          setLeadSiteNote(
+            "Não encontramos site pra esse negócio. Também vira um ponto de atenção genérico na mensagem, sem citar o que é."
           );
         }
       }
@@ -171,18 +194,19 @@ export default function WhatsAppComposerModal({
     [lead.full_name, lead.city, lead.category, lead.meeting_datetime, consultor, extraValues]
   );
 
-  const rendered = useMemo(() => renderWhatsappTemplate(template.text, vars), [template.text, vars]);
+  const renderedBlocks = useMemo(() => renderWhatsappBlocks(template, vars), [template, vars]);
 
-  // Regera o texto a partir do modelo quando o modelo muda (ou os dados
-  // usados nele mudam), mas só enquanto o usuário não tiver editado o
-  // texto manualmente, pra nunca sobrescrever uma edição já feita.
+  // Regera os blocos a partir do modelo quando o modelo muda (ou os dados
+  // usados nele mudam), mas só pros blocos que o usuário não tiver editado
+  // manualmente (por índice), pra nunca sobrescrever uma edição já feita.
   useEffect(() => {
-    if (!dirty) setText(rendered.text);
+    setBlockTexts((prev) => renderedBlocks.blocks.map((b, i) => (blockDirty[i] ? prev[i] ?? b : b)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rendered.text]);
+  }, [renderedBlocks.blocks]);
 
   useEffect(() => {
-    setDirty(false);
+    setBlockDirty(new Array(renderedBlocks.blocks.length).fill(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [templateId]);
 
   async function logEvent(finalText: string) {
@@ -206,17 +230,60 @@ export default function WhatsAppComposerModal({
     }
   }
 
+  // Abre o WhatsApp já com o 1º bloco preenchido (wa.me só aceita um texto
+  // pré-preenchido por link) — os blocos seguintes (quando existem, ver
+  // renderWhatsappBlocks) ficam pra colar um a um manualmente, com uma pausa
+  // natural entre eles, em vez de mandar tudo de uma vez como um bloco só.
+  // O evento registrado na timeline usa a mensagem completa (todos os
+  // blocos), pra manter o histórico fiel ao que de fato foi combinado.
   function handleOpenWhatsapp() {
     if (!digits) return;
-    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
-    logEvent(text);
+    const firstBlock = blockTexts[0] ?? "";
+    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(firstBlock)}`, "_blank", "noopener,noreferrer");
+    logEvent(blockTexts.join("\n\n"));
   }
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(blockTexts.join("\n\n"));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard pode falhar em contexto não seguro, sem tratamento especial
+    }
+  }
+
+  function handleBlockChange(index: number, value: string) {
+    setBlockTexts((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return next;
+    });
+    setBlockDirty((prev) => {
+      const next = [...prev];
+      next[index] = true;
+      return next;
+    });
+  }
+
+  function handleRestoreBlock(index: number) {
+    setBlockDirty((prev) => {
+      const next = [...prev];
+      next[index] = false;
+      return next;
+    });
+    setBlockTexts((prev) => {
+      const next = [...prev];
+      next[index] = renderedBlocks.blocks[index] ?? "";
+      return next;
+    });
+  }
+
+  async function handleCopyBlock(index: number) {
+    try {
+      await navigator.clipboard.writeText(blockTexts[index] ?? "");
+      setCopiedBlock(index);
+      setTimeout(() => setCopiedBlock((c) => (c === index ? null : c)), 2000);
     } catch {
       // clipboard pode falhar em contexto não seguro, sem tratamento especial
     }
@@ -304,6 +371,7 @@ export default function WhatsAppComposerModal({
             <p className="mt-1 text-[11px] text-amber-700">{competitorSearchError}</p>
           )}
           {leadProfileNote && <p className="mt-1 text-[11px] text-sky-700">{leadProfileNote}</p>}
+          {leadSiteNote && <p className="mt-1 text-[11px] text-sky-700">{leadSiteNote}</p>}
           {competitorsFound.length > 0 && (
             <ul className="mt-2 space-y-0.5 text-[11px] text-neutral-600">
               {competitorsFound.map((c, i) => (
@@ -316,30 +384,83 @@ export default function WhatsAppComposerModal({
           )}
         </div>
 
-        {rendered.missing.length > 0 && (
+        {renderedBlocks.missing.length > 0 && (
           <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-            <strong>Faltou preencher: {rendered.missing.map(fieldLabel).join(", ")}.</strong> A(s) frase(s) que
-            usava(m) esse(s) campo(s) não entraram na mensagem. Preencha acima (ou edite o texto abaixo à mão).
+            <strong>Faltou preencher: {renderedBlocks.missing.map(fieldLabel).join(", ")}.</strong> A(s) frase(s)
+            que usava(m) esse(s) campo(s) não entraram na mensagem. Preencha acima (ou edite o texto abaixo à
+            mão).
           </div>
         )}
 
-        <textarea
-          value={text}
-          onChange={(e) => {
-            setText(e.target.value);
-            setDirty(true);
-          }}
-          rows={9}
-          className="mb-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-800"
-        />
-        {dirty && (
-          <button
-            type="button"
-            onClick={() => setDirty(false)}
-            className="mb-3 text-[11px] text-neutral-400 underline decoration-dotted hover:text-neutral-700"
-          >
-            Restaurar texto do modelo
-          </button>
+        {blockTexts.length > 1 ? (
+          <div className="mb-3 space-y-2">
+            <p className="text-[11px] text-neutral-500">
+              Mensagem dividida em {blockTexts.length} blocos. Copie e mande cada um como uma mensagem separada
+              no WhatsApp, com uma pequena pausa entre eles, pra soar como uma conversa normal em vez de um
+              texto único gigante (e não parecer bot).
+            </p>
+            {blockTexts.map((blockText, i) => (
+              <div key={i} className="rounded-md border border-neutral-200 p-2">
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-neutral-400">
+                    Bloco {i + 1} de {blockTexts.length}
+                  </span>
+                  {blockDirty[i] && (
+                    <button
+                      type="button"
+                      onClick={() => handleRestoreBlock(i)}
+                      className="text-[10px] text-neutral-400 underline decoration-dotted hover:text-neutral-700"
+                    >
+                      Restaurar
+                    </button>
+                  )}
+                </div>
+                <textarea
+                  value={blockText}
+                  onChange={(e) => handleBlockChange(i, e.target.value)}
+                  rows={3}
+                  className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-xs text-neutral-800"
+                />
+                <div className="mt-1 flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleCopyBlock(i)}
+                    className="text-[10px] font-medium text-neutral-700 underline decoration-dotted hover:text-neutral-900"
+                  >
+                    {copiedBlock === i ? "Copiado!" : "Copiar este bloco"}
+                  </button>
+                  {i === 0 && (
+                    <button
+                      type="button"
+                      disabled={!digits || logging}
+                      onClick={handleOpenWhatsapp}
+                      className="text-[10px] font-medium text-emerald-700 underline decoration-dotted hover:text-emerald-900 disabled:opacity-50"
+                    >
+                      Abrir WhatsApp com este bloco
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            <textarea
+              value={blockTexts[0] ?? ""}
+              onChange={(e) => handleBlockChange(0, e.target.value)}
+              rows={9}
+              className="mb-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-800"
+            />
+            {blockDirty[0] && (
+              <button
+                type="button"
+                onClick={() => handleRestoreBlock(0)}
+                className="mb-3 text-[11px] text-neutral-400 underline decoration-dotted hover:text-neutral-700"
+              >
+                Restaurar texto do modelo
+              </button>
+            )}
+          </>
         )}
 
         <div className="mb-4 flex flex-wrap gap-2">

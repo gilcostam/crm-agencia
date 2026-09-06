@@ -55,6 +55,16 @@ export interface WhatsappTemplateVars {
   concorrente?: string | null;
   /** Nº de avaliações do concorrente citado em `concorrente`. */
   avaliacoes_concorrente?: string | null;
+  /** Bandeira "sim"/ausente (nunca é exibida como texto) pra alternar o
+   * bloco de diagnóstico entre o tom positivo ("já tem perfil, falta só
+   * otimizar") e o tom de alerta genérico ("achamos um ponto de atenção"),
+   * sem citar o dado em si na mensagem pro lead. Preenchida automaticamente
+   * pela busca de concorrentes (ver checkLeadGoogleProfile em lib/serper.ts),
+   * nunca editada manualmente (por isso não entra em EDITABLE_EXTRA_KEYS). */
+  tem_perfil?: string | null;
+  /** Mesma lógica de `tem_perfil`, mas pra presença de site (ver
+   * hasWebsite em lib/serper.ts). */
+  tem_site?: string | null;
 }
 
 type VarKey = keyof WhatsappTemplateVars;
@@ -70,7 +80,16 @@ const FIELD_LABELS: Record<VarKey, string> = {
   avaliacoes: "nº de avaliações do lead no Google",
   concorrente: "nome do concorrente",
   avaliacoes_concorrente: "nº de avaliações do concorrente",
+  tem_perfil: "se o lead tem perfil no Google",
+  tem_site: "se o lead tem site",
 };
+
+/** Vars usadas só como bandeira de presença/ausência (`tem_perfil`,
+ * `tem_site`), nunca exibidas como texto. Ausência delas é um resultado
+ * válido e esperado (ex.: lead realmente não tem site) e não deve disparar
+ * o aviso de "faltou preencher" do composer, por isso ficam de fora do
+ * cálculo de `missing` em `renderWhatsappTemplate`. */
+const SILENT_FLAG_KEYS = new Set<VarKey>(["tem_perfil", "tem_site"]);
 
 export function fieldLabel(field: string): string {
   return FIELD_LABELS[field as VarKey] ?? field;
@@ -120,7 +139,18 @@ export interface WhatsappTemplate {
   /** "ativo" ou "pago" restringe o modelo a leads daquele canal (ver
    * whatsappChannelForSource); "ambos" aparece nos dois. */
   channel: WhatsappChannel | "ambos";
+  /** Texto único (compatibilidade com o composer de textarea simples). Pra
+   * modelos com `blocks`, é só a concatenação deles (usado por
+   * `templateUsesVar`/detecção de campos extras, nunca exibido sozinho). */
   text: string;
+  /** Quando presente, o composer mostra a mensagem dividida em blocos
+   * separados (uma "bolha" por bloco, cada um com seu próprio botão de
+   * copiar) em vez de um texto único gigante, pra soar como uma conversa
+   * humana normal (várias mensagens curtas) em vez de um bloco de texto que
+   * parece gerado por bot. Blocos que renderizam vazios (ex.: seção
+   * condicional sem conteúdo) são descartados automaticamente, ver
+   * `renderWhatsappBlocks`. */
+  blocks?: string[];
 }
 
 /** Assinatura opcional ao final da mensagem, some por completo se o
@@ -130,6 +160,31 @@ const SIGNATURE = "{{#consultor}}\n\nAbraço, {{consultor}}, da No Limits{{/cons
 function withSignature(text: string): string {
   return `${text}${SIGNATURE}`;
 }
+
+/**
+ * Diagnóstico "Google e IA" dividido em blocos curtos (ver `blocks` em
+ * WhatsappTemplate) em vez de um texto único, pra soar como uma sequência
+ * natural de mensagens de WhatsApp em vez de um bloco de texto que parece
+ * gerado por bot. Tom pensado pra nunca soar acusatório:
+ *  - Se o lead tem perfil no Google (`tem_perfil`), parabeniza: já tem a
+ *    base pra ranquear, falta só otimizar.
+ *  - Se não tem perfil, ou não tem site (`tem_site`), sinaliza como "ponto
+ *    de atenção" de forma genérica, sem revelar qual é o problema (a ideia é
+ *    despertar curiosidade, não dar o diagnóstico de graça por texto).
+ *  - Sempre fecha com o gancho da reunião: mostrar ao vivo, no mapa da
+ *    cidade, as oportunidades que não estão sendo aproveitadas, sem precisar
+ *    de anúncio pago.
+ * `tem_perfil`/`tem_site` são preenchidos automaticamente pela busca de
+ * concorrentes (ver handleSearchCompetitors no composer), nunca digitados à
+ * mão.
+ */
+const DIAGNOSTICO_IA_BLOCKS: string[] = [
+  `Nosso time fez uma análise rápida e gratuita da presença digital d{{#categoria}}o seu negócio de {{categoria}}{{/categoria}}{{^categoria}}o seu negócio{{/categoria}} no Google{{#cidade}} em {{cidade}}{{/cidade}}, incluindo como vocês aparecem quando alguém pergunta pra ferramentas de IA, tipo ChatGPT, antes de escolher{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} um profissional{{/categoria}}.`,
+  `{{#tem_perfil}}Boa notícia: vocês já têm perfil no Google{{#avaliacoes}}, com {{avaliacoes}} avaliações{{/avaliacoes}}. Isso já é a base que precisa pra ranquear bem, falta só ajustar alguns pontos de otimização.{{/tem_perfil}}{{^tem_perfil}}Encontramos um ponto de atenção na presença de vocês no Google que vale a pena corrigir o quanto antes.{{/tem_perfil}}`,
+  `{{^tem_site}}Também identificamos outro ponto de atenção fora do Google, que impacta diretamente quantas pessoas conseguem encontrar vocês hoje.{{/tem_site}}`,
+  `{{#concorrente}}Hoje quem aparece na frente {{#categoria}}pra "{{categoria}}{{#cidade}} em {{cidade}}{{/cidade}}"{{/categoria}}{{^categoria}}nessa busca{{/categoria}} é {{concorrente}}{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}}. Dá pra disputar essa posição sem depender de anúncio pago.{{/concorrente}}`,
+  `Separei um horário pra te mostrar tudo isso ao vivo: vou abrir o mapa d{{#cidade}}e {{cidade}}{{/cidade}}{{^cidade}}a sua região{{/cidade}} e te mostrar, na tela, todas as oportunidades que existem hoje e não estão sendo aproveitadas pra vocês aparecerem entre os primeiros no Google, sem precisar pagar anúncio. Posso te mostrar essa semana?`,
+];
 
 export const WHATSAPP_TEMPLATES: WhatsappTemplate[] = [
   // ---- Canal "ativo": prospecção ativa / cadastro manual ----
@@ -193,16 +248,11 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
     id: "diagnostico_ia",
     label: "Diagnóstico (Google e IA)",
     description:
-      "Primeiro contato feito por um humano, mandado logo depois da boas-vindas automática: apresenta o diagnóstico em texto, comparando o lead com o concorrente e destacando a busca por IA. Preencha as avaliações/concorrente antes de enviar.",
+      "Primeiro contato feito por um humano, mandado logo depois da boas-vindas automática. Enviado como uma sequência de mensagens curtas (não um texto único) pra soar natural. Tom se ajusta sozinho: parabeniza quem já tem perfil no Google, e só sinaliza pontos de atenção de forma genérica (sem revelar detalhes) pra despertar curiosidade sobre a reunião. Rode a busca de concorrentes antes de enviar pra preencher os dados automaticamente.",
     appliesTo: ["primeiro_contato"],
     channel: "pago",
-    text: `Nosso time fez uma análise rápida e gratuita da presença digital d{{#categoria}}o seu negócio de {{categoria}}{{/categoria}}{{^categoria}}o seu negócio{{/categoria}} no Google, comparando com os concorrentes mais bem posicionados{{#cidade}} em {{cidade}}{{/cidade}}, e também testamos como vocês aparecem quando alguém procura {{#categoria}}"{{categoria}}{{#cidade}} em {{cidade}}{{/cidade}}"{{/categoria}}{{^categoria}}esse serviço{{/categoria}}.
-
-O resultado chamou atenção: o perfil de vocês no Google tem{{#avaliacoes}} só {{avaliacoes}} avaliações{{/avaliacoes}}{{^avaliacoes}} poucas avaliações{{/avaliacoes}}{{#concorrente}}, enquanto quem lidera a categoria ({{concorrente}}) tem{{#avaliacoes_concorrente}} {{avaliacoes_concorrente}}{{/avaliacoes_concorrente}}{{/concorrente}}. E n{{#categoria}}a busca por "{{categoria}}{{#cidade}} em {{cidade}}{{/cidade}}"{{/categoria}}{{^categoria}}essa busca{{/categoria}}, vocês nem aparecem entre os primeiros resultados, nem no Maps nem na busca tradicional.
-
-Isso pesa tanto pra quem pesquisa no Google quanto pra quem hoje já pergunta direto pra ferramentas de IA, tipo ChatGPT, antes de escolher{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} um profissional{{/categoria}}.
-
-Se fizer sentido pra você, tenho um horário livre essa semana pra conversarmos rapidinho sobre como reverter isso. Podemos marcar?`,
+    text: DIAGNOSTICO_IA_BLOCKS.join("\n\n"),
+    blocks: DIAGNOSTICO_IA_BLOCKS,
   },
   {
     id: "cobranca_diagnostico_pago",
@@ -294,7 +344,7 @@ export function renderWhatsappTemplate(
     text = text.replace(SECTION_RE, (_match, kind: string, field: string, inner: string) => {
       const key = field as VarKey;
       const isPresent = present(key);
-      if (!isPresent) missing.add(key);
+      if (!isPresent && !SILENT_FLAG_KEYS.has(key)) missing.add(key);
       if (kind === "#") return isPresent ? inner : "";
       return isPresent ? "" : inner; // kind === "^"
     });
@@ -319,6 +369,30 @@ export function renderWhatsappTemplate(
   return { text, missing: Array.from(missing) };
 }
 
+/**
+ * Renderiza um `WhatsappTemplate` como uma lista de blocos de mensagem
+ * (ver `blocks` em WhatsappTemplate). Pra modelos sem `blocks` definidos,
+ * devolve uma lista de um único bloco (idêntico ao comportamento antigo de
+ * `renderWhatsappTemplate(template.text, vars)`), então o composer pode usar
+ * sempre esta função e só mudar a interface quando `blocks.length > 1`.
+ * Blocos que renderizam vazios (ex.: seção condicional sem conteúdo, como o
+ * bloco de "sem site" quando o lead tem site) são descartados.
+ */
+export function renderWhatsappBlocks(
+  template: WhatsappTemplate,
+  vars: WhatsappTemplateVars
+): { blocks: string[]; missing: string[] } {
+  const source = template.blocks && template.blocks.length > 0 ? template.blocks : [template.text];
+  const missing = new Set<string>();
+  const blocks: string[] = [];
+  for (const blockText of source) {
+    const rendered = renderWhatsappTemplate(blockText, vars);
+    rendered.missing.forEach((m) => missing.add(m));
+    if (rendered.text.trim()) blocks.push(rendered.text.trim());
+  }
+  return { blocks, missing: Array.from(missing) };
+}
+
 export function buildTemplateVars(
   lead: { full_name: string | null; city: string | null; category: string | null },
   extras: Partial<Record<Exclude<VarKey, "nome" | "primeiro_nome" | "cidade" | "categoria">, string | null>> = {}
@@ -335,5 +409,7 @@ export function buildTemplateVars(
     avaliacoes: extras.avaliacoes?.trim() || null,
     concorrente: extras.concorrente?.trim() || null,
     avaliacoes_concorrente: extras.avaliacoes_concorrente?.trim() || null,
+    tem_perfil: extras.tem_perfil?.trim() || null,
+    tem_site: extras.tem_site?.trim() || null,
   };
 }
