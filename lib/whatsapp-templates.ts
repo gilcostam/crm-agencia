@@ -262,13 +262,16 @@ Recebemos os seus dados sobre melhorar a visibilidade digital do seu negócio{{#
 
 Em breve entraremos em contato para apresentar o diagnóstico completo de visibilidade digital do seu negócio.`,
   },
+  // channel "ambos": mora nesta seção por ter nascido pro fluxo de tráfego
+  // pago (onde é o padrão do 1º contato humano), mas também aparece como
+  // opção selecionável pra leads de prospecção ativa (ver getTemplatesForChannel).
   {
     id: "diagnostico_ia",
     label: "Diagnóstico (Google e IA)",
     description:
-      "Primeiro contato feito por um humano, mandado logo depois da boas-vindas automática. Enviado como uma sequência de mensagens curtas (não um texto único) pra soar natural. Tom se ajusta sozinho: parabeniza quem já tem perfil no Google, e só sinaliza pontos de atenção de forma genérica (sem revelar detalhes) pra despertar curiosidade sobre a reunião. Rode a busca de concorrentes antes de enviar pra preencher os dados automaticamente.",
+      "Diagnóstico com base em buscas reais no Google e nas respostas de ferramentas de IA (ChatGPT), enviado como uma sequência de mensagens curtas (não um texto único) pra soar natural. Tom se ajusta sozinho: parabeniza quem já tem perfil no Google, e só sinaliza pontos de atenção de forma genérica (sem revelar detalhes) pra despertar curiosidade sobre a reunião. Rode a busca de concorrentes antes de enviar pra preencher os dados automaticamente. Em tráfego pago é o modelo padrão do 1º contato humano (mandado logo depois da boas-vindas automática); na prospecção ativa é uma opção pra mandar o diagnóstico direto por texto, em vez do PDF, pra quem já topou receber.",
     appliesTo: ["primeiro_contato"],
-    channel: "pago",
+    channel: "ambos",
     text: DIAGNOSTICO_IA_BLOCKS.join("\n\n"),
     blocks: DIAGNOSTICO_IA_BLOCKS,
   },
