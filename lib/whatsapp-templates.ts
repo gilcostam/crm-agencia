@@ -186,6 +186,24 @@ const DIAGNOSTICO_IA_BLOCKS: string[] = [
   `Separei um horário pra te mostrar tudo isso ao vivo: vou abrir o mapa d{{#cidade}}e {{cidade}}{{/cidade}}{{^cidade}}a sua região{{/cidade}} e te mostrar, na tela, todas as oportunidades que existem hoje e não estão sendo aproveitadas pra vocês aparecerem entre os primeiros no Google, sem precisar pagar anúncio. Posso te mostrar essa semana?`,
 ];
 
+/**
+ * Mensagem de "break off" (desqualificação educada): usada quando o time
+ * decide tirar o lead da lista ativa por falta de retorno/prioridade, mas
+ * sem fechar a porta. Dividida em blocos curtos, no mesmo espírito de
+ * DIAGNOSTICO_IA_BLOCKS, pra soar como uma despedida natural e não um aviso
+ * automático. Nunca cita concorrente específico (só "os concorrentes",
+ * genérico) porque, diferente do diagnóstico, aqui não necessariamente
+ * rodamos uma busca fresca antes de mandar — citar nome exigiria conferir o
+ * dado na hora (ver skill abordagem-lead-formulario).
+ */
+const BREAK_OFF_BLOCKS: string[] = [
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}tudo bem?`,
+  `Como não tivemos retorno por aqui, entendemos que ganhar mais visibilidade no Google e nas respostas que as ferramentas de IA dão (ChatGPT, Gemini e outras) não é uma prioridade{{#categoria}} pra {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} nesse momento. Sem problema, cada negócio tem o seu momento certo pra isso.`,
+  `Vou tirar seu contato da nossa lista ativa de leads por aqui, pra não ficar te enchendo o WhatsApp à toa.`,
+  `Só deixo um ponto de atenção: enquanto isso, os concorrentes{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} estão ocupando esse espaço, tanto no Google quanto nas respostas que as IAs dão pra quem procura por{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} esse serviço{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}. É um espaço que tende a ficar mais disputado com o tempo, não menos.`,
+  `De qualquer forma, fico à disposição. Se em algum momento isso virar prioridade, é só me chamar que a gente retoma a conversa de onde parou.${SIGNATURE}`,
+];
+
 export const WHATSAPP_TEMPLATES: WhatsappTemplate[] = [
   // ---- Canal "ativo": prospecção ativa / cadastro manual ----
   {
@@ -292,10 +310,20 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     ),
   },
   {
+    id: "break_off",
+    label: "Break off (desqualificação educada)",
+    description:
+      "Para quando o time decide tirar o lead da lista ativa por falta de retorno/prioridade, sem fechar a porta: avisa que ele será removido da lista, mas deixa um ponto de atenção sobre concorrentes ocupando espaço no Google e nas IAs enquanto isso.",
+    appliesTo: ["desqualificado"],
+    channel: "ambos",
+    text: BREAK_OFF_BLOCKS.join("\n\n"),
+    blocks: BREAK_OFF_BLOCKS,
+  },
+  {
     id: "personalizada",
     label: "Mensagem em branco",
-    description: "Sem modelo. Escreva do zero, usado como padrão fora do funil de contato (Contrato Assinado, Retornar Depois, Finalizado, Desqualificado).",
-    appliesTo: ["contrato_assinado", "retornar_depois", "finalizado", "desqualificado"],
+    description: "Sem modelo. Escreva do zero, usado como padrão fora do funil de contato (Contrato Assinado, Retornar Depois, Finalizado).",
+    appliesTo: ["contrato_assinado", "retornar_depois", "finalizado"],
     channel: "ambos",
     text: "",
   },
