@@ -17,7 +17,7 @@ export type LeadStatus =
  * por tráfego pago (Meta Ads), Trello ou cadastro manual. Usado pra separar
  * o Kanban de "Leads" (tráfego pago) do menu "Prospecção Ativa" no dashboard
  * (ver app/dashboard/prospeccao/page.tsx e app/api/leads/route.ts). */
-export const ACTIVE_PROSPECTING_SOURCES = ["tng_prospeccao", "prospeccao"] as const;
+export const ACTIVE_PROSPECTING_SOURCES = ["tng_prospeccao", "prospeccao", "instagram"] as const;
 
 export interface Lead {
   id: string;
@@ -26,6 +26,9 @@ export interface Lead {
   phone: string | null;
   city: string | null;
   category: string | null;
+  /** Handle do Instagram do lead, sem "@" (ex.: "nome.sobrenome") — usado na
+   * prospecção ativa via Instagram Direct. */
+  instagram: string | null;
   status: LeadStatus;
   /** Data/hora (ISO) em que cada status foi alcançado pela última vez — não
    * inclui "novo_lead" (usar `created_at` pra isso). Preenchido

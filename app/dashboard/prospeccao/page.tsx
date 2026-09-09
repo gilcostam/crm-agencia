@@ -33,6 +33,7 @@ export default async function ProspeccaoPage() {
       title="Prospecção Ativa"
       pollQuery={`source=${ACTIVE_PROSPECTING_SOURCES.join(",")}`}
       enableTngImport
+      enableInstagramImport
     />
   );
 }

@@ -15,6 +15,7 @@ import {
 } from "@/lib/types";
 import { sanitizePhone } from "@/lib/phone";
 import WhatsAppComposerModal from "./_components/WhatsAppComposerModal";
+import InstagramComposerModal from "./_components/InstagramComposerModal";
 
 const POLL_INTERVAL_MS = 4000;
 const STALE_STATUSES: LeadStatus[] = [
@@ -222,6 +223,7 @@ interface LeadDetailModalProps {
   onSaveMonthlyValue: (id: string, value: number | null) => Promise<void>;
   onSaveNextFollowup: (id: string, date: string | null) => Promise<void>;
   onOpenComposer: (id: string) => void;
+  onOpenInstagramComposer: (id: string) => void;
 }
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
@@ -243,6 +245,7 @@ function LeadDetailModal({
   onSaveMonthlyValue,
   onSaveNextFollowup,
   onOpenComposer,
+  onOpenInstagramComposer,
 }: LeadDetailModalProps) {
   const [notes, setNotes] = useState(lead.notes ?? "");
   const [meetingValue, setMeetingValue] = useState(toDatetimeLocalValue(lead.meeting_datetime));
@@ -410,6 +413,15 @@ function LeadDetailModal({
               Conversar no WhatsApp
             </button>
           )}
+          {lead.instagram && (
+            <button
+              type="button"
+              onClick={() => onOpenInstagramComposer(lead.id)}
+              className="inline-flex items-center gap-1.5 rounded-md bg-fuchsia-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-fuchsia-700"
+            >
+              📷 Conversar no Instagram
+            </button>
+          )}
           {lead.email && (
             <a
               href={`mailto:${lead.email}`}
@@ -454,6 +466,7 @@ function LeadDetailModal({
         <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
           <Field label="Telefone" value={lead.phone} />
           <Field label="E-mail" value={lead.email} />
+          <Field label="Instagram" value={lead.instagram ? `@${lead.instagram}` : null} />
           <Field label="Cidade" value={lead.city} />
           <Field label="Categoria" value={lead.category} />
           <Field label="Origem" value={lead.source} />
@@ -706,6 +719,7 @@ interface NewLeadModalProps {
     full_name: string;
     phone: string;
     email: string;
+    instagram: string;
     city: string;
     category: string;
     notes: string;
@@ -718,6 +732,7 @@ function NewLeadModal({ onClose, onCreate }: NewLeadModalProps) {
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+  const [instagram, setInstagram] = useState("");
   const [city, setCity] = useState("");
   const [category, setCategory] = useState("");
   const [notes, setNotes] = useState("");
@@ -743,6 +758,7 @@ function NewLeadModal({ onClose, onCreate }: NewLeadModalProps) {
       full_name: fullName,
       phone,
       email,
+      instagram,
       city,
       category,
       notes,
@@ -813,6 +829,18 @@ function NewLeadModal({ onClose, onCreate }: NewLeadModalProps) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded border border-neutral-200 bg-white px-2 py-1.5 text-sm text-neutral-700"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-neutral-500">
+              Instagram
+            </label>
+            <input
+              type="text"
+              placeholder="@handle ou link do perfil"
+              value={instagram}
+              onChange={(e) => setInstagram(e.target.value)}
               className="w-full rounded border border-neutral-200 bg-white px-2 py-1.5 text-sm text-neutral-700"
             />
           </div>
@@ -907,11 +935,93 @@ function NewLeadModal({ onClose, onCreate }: NewLeadModalProps) {
   );
 }
 
+interface InstagramImportModalProps {
+  onClose: () => void;
+  onSubmit: (text: string) => Promise<void>;
+  submitting: boolean;
+}
+
+/** Import em lote de leads de Instagram — cola-se um perfil por linha (URL
+ * ou @handle, opcionalmente seguido de ";nome;categoria;cidade"). Mesma
+ * ideia do upload de CSV do TNG, mas em texto colado porque não existe um
+ * "export" de arquivo do Instagram — a lista normalmente vem de perfis
+ * encontrados manualmente. */
+function InstagramImportModal({ onClose, onSubmit, submitting }: InstagramImportModalProps) {
+  const [text, setText] = useState("");
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-start justify-between">
+          <h3 className="font-serif text-xl text-neutral-900">Importar leads do Instagram</h3>
+          <button
+            onClick={onClose}
+            className="text-lg leading-none text-neutral-400 hover:text-neutral-900"
+            aria-label="Fechar"
+          >
+            ✕
+          </button>
+        </div>
+
+        <p className="mb-3 text-xs text-neutral-500">
+          Cole uma URL ou @handle do Instagram por linha. Opcionalmente, acrescente nome,
+          categoria e cidade separados por ponto e vírgula:
+        </p>
+        <pre className="mb-3 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] text-neutral-500">
+          https://www.instagram.com/fulano/;Fulano da Silva;Odontologia;Catanduva{"\n"}
+          @fulana.consultorio;;Estética
+        </pre>
+
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={8}
+          placeholder="Cole os perfis aqui, um por linha..."
+          className="w-full rounded border border-neutral-200 bg-white px-2 py-1.5 text-sm text-neutral-700"
+        />
+
+        <div className="mt-5 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-100"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            disabled={submitting || !text.trim()}
+            onClick={() => onSubmit(text)}
+            className="rounded-md bg-neutral-900 px-4 py-1.5 text-xs font-medium text-white hover:bg-neutral-700 disabled:opacity-50"
+          >
+            {submitting ? "Importando..." : "Importar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardClient({
   initialLeads,
   title = "Leads",
   pollQuery = "",
   enableTngImport = false,
+  enableInstagramImport = false,
 }: {
   initialLeads: Lead[];
   /** Título exibido no cabeçalho da página (ex.: "Prospecção Ativa" na tela
@@ -926,6 +1036,9 @@ export default function DashboardClient({
   /** Mostra o botão "Importar CSV do TNG Pesquisa" no toolbar — só faz
    * sentido na tela de Prospecção Ativa (ver app/dashboard/prospeccao/page.tsx). */
   enableTngImport?: boolean;
+  /** Mostra o botão "Importar leads do Instagram" no toolbar — mesmo
+   * critério do enableTngImport, só na tela de Prospecção Ativa. */
+  enableInstagramImport?: boolean;
 }) {
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -933,6 +1046,7 @@ export default function DashboardClient({
   const [flashIds, setFlashIds] = useState<Set<string>>(new Set());
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [composerLeadId, setComposerLeadId] = useState<string | null>(null);
+  const [instagramComposerLeadId, setInstagramComposerLeadId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [followupFilter, setFollowupFilter] = useState<"all" | FollowupUrgency>("all");
@@ -950,6 +1064,15 @@ export default function DashboardClient({
     imported: number;
   } | null>(null);
   const tngFileInputRef = useRef<HTMLInputElement>(null);
+  const [showInstagramImportModal, setShowInstagramImportModal] = useState(false);
+  const [importingInstagram, setImportingInstagram] = useState(false);
+  const [instagramImportError, setInstagramImportError] = useState<string | null>(null);
+  const [instagramImportResult, setInstagramImportResult] = useState<{
+    totalLines: number;
+    skippedInvalid: number;
+    mergedCount: number;
+    imported: number;
+  } | null>(null);
   // Controla quais lembretes já notificamos nesta sessão, pra não repetir
   // a cada ciclo de polling (4s) enquanto a aba fica aberta. Pré-populado
   // com o estado já existente ao abrir a página — os selos visuais no
@@ -1067,6 +1190,42 @@ export default function DashboardClient({
     return () => clearTimeout(timeout);
   }, [tngImportResult, tngImportError]);
 
+  useEffect(() => {
+    if (!instagramImportResult && !instagramImportError) return;
+    const timeout = setTimeout(() => {
+      setInstagramImportResult(null);
+      setInstagramImportError(null);
+    }, 15000);
+    return () => clearTimeout(timeout);
+  }, [instagramImportResult, instagramImportError]);
+
+  async function handleInstagramImportSubmit(text: string) {
+    setImportingInstagram(true);
+    setInstagramImportError(null);
+    setInstagramImportResult(null);
+
+    try {
+      const res = await fetch("/api/leads/import-instagram", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data) {
+        setInstagramImportError(data?.error || "Erro ao importar os perfis.");
+      } else {
+        setInstagramImportResult(data);
+        setShowInstagramImportModal(false);
+        await refresh();
+      }
+    } catch {
+      setInstagramImportError("Erro de conexão ao importar os perfis.");
+    } finally {
+      setImportingInstagram(false);
+    }
+  }
+
   async function handleTngCsvChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1169,6 +1328,7 @@ export default function DashboardClient({
     full_name: string;
     phone: string;
     email: string;
+    instagram: string;
     city: string;
     category: string;
     notes: string;
@@ -1231,7 +1391,7 @@ export default function DashboardClient({
         if (dateToMs !== null && createdMs > dateToMs) return false;
       }
       if (!q) return true;
-      const haystack = [l.full_name, l.phone, l.email, l.city, l.category]
+      const haystack = [l.full_name, l.phone, l.email, l.instagram, l.city, l.category]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
@@ -1368,6 +1528,7 @@ export default function DashboardClient({
 
   const selectedLead = leads.find((l) => l.id === selectedLeadId) ?? null;
   const composerLead = leads.find((l) => l.id === composerLeadId) ?? null;
+  const instagramComposerLead = leads.find((l) => l.id === instagramComposerLeadId) ?? null;
 
   return (
     <div className="min-h-screen bg-neutral-100">
@@ -1453,6 +1614,48 @@ export default function DashboardClient({
               }}
               className={`ml-3 shrink-0 ${
                 tngImportError
+                  ? "text-red-500 hover:text-red-900"
+                  : "text-emerald-500 hover:text-emerald-900"
+              }`}
+              aria-label="Fechar aviso"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {enableInstagramImport && (instagramImportResult || instagramImportError) && (
+          <div
+            className={`mb-5 flex items-center justify-between rounded-md border px-4 py-2.5 text-sm ${
+              instagramImportError
+                ? "border-red-300 bg-red-50 text-red-800"
+                : "border-emerald-300 bg-emerald-50 text-emerald-800"
+            }`}
+          >
+            <span>
+              {instagramImportError
+                ? `❌ ${instagramImportError}`
+                : instagramImportResult && (
+                    <>
+                      ✅ Instagram importado: <strong>{instagramImportResult.imported}</strong>{" "}
+                      leads criados/atualizados de {instagramImportResult.totalLines} linhas
+                      {instagramImportResult.skippedInvalid > 0
+                        ? ` (${instagramImportResult.skippedInvalid} inválidas, puladas)`
+                        : ""}
+                      {instagramImportResult.mergedCount > 0
+                        ? ` (${instagramImportResult.mergedCount} perfis duplicados agrupados)`
+                        : ""}
+                      .
+                    </>
+                  )}
+            </span>
+            <button
+              onClick={() => {
+                setInstagramImportResult(null);
+                setInstagramImportError(null);
+              }}
+              className={`ml-3 shrink-0 ${
+                instagramImportError
                   ? "text-red-500 hover:text-red-900"
                   : "text-emerald-500 hover:text-emerald-900"
               }`}
@@ -1553,6 +1756,15 @@ export default function DashboardClient({
               </button>
             </>
           )}
+          {enableInstagramImport && (
+            <button
+              onClick={() => setShowInstagramImportModal(true)}
+              disabled={importingInstagram}
+              className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {importingInstagram ? "Importando..." : "Importar leads do Instagram"}
+            </button>
+          )}
           <button
             onClick={() => setShowNewLeadModal(true)}
             className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-700"
@@ -1636,22 +1848,40 @@ export default function DashboardClient({
                           <p className="text-sm font-medium text-neutral-900">
                             {lead.full_name || "Sem nome"}
                           </p>
-                          {wa && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setComposerLeadId(lead.id);
-                              }}
-                              title="Conversar no WhatsApp"
-                              className="shrink-0 rounded-full bg-emerald-500 p-1.5 text-white hover:bg-emerald-600"
-                            >
-                              <WhatsAppIcon />
-                            </button>
-                          )}
+                          <div className="flex shrink-0 gap-1">
+                            {wa && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setComposerLeadId(lead.id);
+                                }}
+                                title="Conversar no WhatsApp"
+                                className="shrink-0 rounded-full bg-emerald-500 p-1.5 text-white hover:bg-emerald-600"
+                              >
+                                <WhatsAppIcon />
+                              </button>
+                            )}
+                            {lead.instagram && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setInstagramComposerLeadId(lead.id);
+                                }}
+                                title="Conversar no Instagram"
+                                className="shrink-0 rounded-full bg-fuchsia-600 p-1.5 text-white hover:bg-fuchsia-700"
+                              >
+                                📷
+                              </button>
+                            )}
+                          </div>
                         </div>
                         {lead.phone && (
                           <p className="text-xs text-neutral-500">{lead.phone}</p>
+                        )}
+                        {lead.instagram && (
+                          <p className="text-xs text-neutral-500">@{lead.instagram}</p>
                         )}
                         {lead.city && (
                           <p className="truncate text-xs text-neutral-500">
@@ -1789,6 +2019,7 @@ export default function DashboardClient({
           onSaveMonthlyValue={saveMonthlyValue}
           onSaveNextFollowup={saveNextFollowup}
           onOpenComposer={setComposerLeadId}
+          onOpenInstagramComposer={setInstagramComposerLeadId}
         />
       )}
 
@@ -1796,8 +2027,23 @@ export default function DashboardClient({
         <WhatsAppComposerModal lead={composerLead} onClose={() => setComposerLeadId(null)} />
       )}
 
+      {instagramComposerLead && (
+        <InstagramComposerModal
+          lead={instagramComposerLead}
+          onClose={() => setInstagramComposerLeadId(null)}
+        />
+      )}
+
       {showNewLeadModal && (
         <NewLeadModal onClose={() => setShowNewLeadModal(false)} onCreate={createLead} />
+      )}
+
+      {showInstagramImportModal && (
+        <InstagramImportModal
+          onClose={() => setShowInstagramImportModal(false)}
+          onSubmit={handleInstagramImportSubmit}
+          submitting={importingInstagram}
+        />
       )}
     </div>
   );

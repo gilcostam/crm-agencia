@@ -286,3 +286,12 @@ alter table public.client_tasks
 -- ver quando o lead chegou, quando foi o 1º/2º/3º contato etc.
 alter table public.leads
   add column if not exists status_dates jsonb not null default '{}'::jsonb;
+
+-- Handle do Instagram do lead (sem "@", ex.: "nome.sobrenome") — usado pra
+-- prospecção ativa via Instagram Direct (import manual/bulk de perfis, ver
+-- app/api/leads/import-instagram/route.ts e lib/instagram.ts). Alimenta o
+-- botão "Abrir Direct no Instagram" no modal de detalhe do lead
+-- (app/dashboard/_components/InstagramComposerModal.tsx). Dedupe usa
+-- external_key = "instagram:<handle>" (mesmo índice único já existente).
+alter table public.leads
+  add column if not exists instagram text;

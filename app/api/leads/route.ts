@@ -4,6 +4,7 @@ import { hasValidSession, isValidSessionToken, SESSION_COOKIE_NAME } from "@/lib
 import { createServiceClient } from "@/lib/supabase/server";
 import { LeadStatus, STATUS_ORDER } from "@/lib/types";
 import { buildStatusChangeUpdate } from "@/lib/lead-status";
+import { parseInstagramHandle } from "@/lib/instagram";
 
 /** Usado pelo polling do dashboard (app/dashboard/dashboard-client.tsx) pra
  * manter cada tela restrita ao mesmo recorte de leads que o server component
@@ -52,27 +53,37 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const { full_name, phone, email, city, category, notes, status, monthly_value } = body as {
-    full_name?: string;
-    phone?: string;
-    email?: string;
-    city?: string;
-    category?: string;
-    notes?: string;
-    status?: string;
-    monthly_value?: number | null;
-  };
+  const { full_name, phone, email, city, category, notes, status, monthly_value, instagram } =
+    body as {
+      full_name?: string;
+      phone?: string;
+      email?: string;
+      city?: string;
+      category?: string;
+      notes?: string;
+      status?: string;
+      monthly_value?: number | null;
+      instagram?: string;
+    };
 
   const name = (full_name ?? "").trim();
   const phoneTrimmed = (phone ?? "").trim();
   const emailTrimmed = (email ?? "").trim();
+  const instagramTrimmed = (instagram ?? "").trim();
+  const instagramHandle = instagramTrimmed ? parseInstagramHandle(instagramTrimmed) : null;
 
   if (!name) {
     return NextResponse.json({ error: "Nome é obrigatório" }, { status: 400 });
   }
-  if (!phoneTrimmed && !emailTrimmed) {
+  if (instagramTrimmed && !instagramHandle) {
     return NextResponse.json(
-      { error: "Informe pelo menos telefone ou e-mail" },
+      { error: "Instagram inválido — use @handle ou o link do perfil" },
+      { status: 400 }
+    );
+  }
+  if (!phoneTrimmed && !emailTrimmed && !instagramHandle) {
+    return NextResponse.json(
+      { error: "Informe pelo menos telefone, e-mail ou Instagram" },
       { status: 400 }
     );
   }
@@ -100,6 +111,11 @@ export async function POST(request: NextRequest) {
     next_followup?: string | null;
   } = initialStatus === "novo_lead" ? {} : buildStatusChangeUpdate({}, initialStatus);
 
+  // Cadastro manual sem telefone/e-mail mas com Instagram entra direto como
+  // lead de prospecção ativa via Instagram (ver ACTIVE_PROSPECTING_SOURCES
+  // em lib/types.ts), pra aparecer no Kanban de Prospecção Ativa.
+  const source = !phoneTrimmed && !emailTrimmed && instagramHandle ? "instagram" : "manual";
+
   const { data, error } = await supabase
     .from("leads")
     .insert({
@@ -108,8 +124,9 @@ export async function POST(request: NextRequest) {
       email: emailTrimmed || null,
       city: city?.trim() || null,
       category: category?.trim() || null,
+      instagram: instagramHandle,
       status: initialStatus,
-      source: "manual",
+      source,
       notes: notes?.trim() || null,
       monthly_value: monthly_value ?? null,
       ...(statusExtras.status_dates ? { status_dates: statusExtras.status_dates } : {}),
