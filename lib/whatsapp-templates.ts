@@ -298,6 +298,21 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
     ),
   },
   {
+    id: "lembrete_reuniao",
+    label: "Lembrete de reunião (com bônus)",
+    description:
+      "Lembrete pra mandar perto da data marcada (véspera ou no dia), reforçando o horário e usando o gancho de um bônus exclusivo, só pra quem comparecer, pra reduzir no-show.",
+    appliesTo: ["reuniao_marcada"],
+    channel: "ambos",
+    text: withSignature(
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}passando pra lembrar da nossa conversa{{#reuniao}} marcada pra {{reuniao}}{{/reuniao}}! Vou te mostrar ao vivo o diagnóstico completo{{#categoria}} d{{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} e as oportunidades reais pra atrair mais pacientes pelo Google e pelas buscas por IA.
+
+Um adianto: só quem comparece à reunião garante, sem custo, um bônus exclusivo pra aumentar ainda mais a visibilidade do negócio. É uma condição especial só pra esse encontro, não fica disponível depois.
+
+Confirma presença{{#reuniao}} pra {{reuniao}}{{/reuniao}}?`
+    ),
+  },
+  {
     id: "no_show_resgate",
     label: "Resgate (não compareceu)",
     description:

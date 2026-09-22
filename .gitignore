@@ -42,3 +42,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Backups locais de banco (contém PII de leads — nunca commitar)
+supabase/backups/
