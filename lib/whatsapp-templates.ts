@@ -17,13 +17,14 @@ import { LeadStatus } from "./types";
  * Existem dois "canais" de modelo (ver `WhatsappChannel`):
  *  - "ativo": leads de prospecção ativa (fonte tng_prospeccao/prospeccao) ou
  *    cadastrados manualmente. Ninguém mandou nada pra esse lead ainda — o
- *    primeiro modelo é a abordagem inicial completa.
+ *    1º contato já é o diagnóstico (ver doc da cadência mais abaixo).
  *  - "pago": leads que chegam por Meta Ads ou Trello (ver
  *    ACTIVE_PROSPECTING_SOURCES/whatsappChannelForSource) e que já recebem,
  *    automaticamente, uma mensagem de boas-vindas assim que entram no CRM
  *    (ver lib/whatsapp-automation.ts:triggerWhatsappSequence, disparada pelos
- *    webhooks do Meta e do Trello). Pra esses leads o funil manual começa já
- *    no diagnóstico (2º contato), não numa "primeira abordagem" do zero.
+ *    webhooks do Meta e do Trello). Essa boas-vindas é só um aviso de
+ *    recebimento — não conta como um dos 8 contatos da cadência. O 1º
+ *    contato de verdade, pros dois canais, é o diagnóstico.
  */
 
 /** Placeholders aceitos nos templates abaixo. */
@@ -121,9 +122,10 @@ const AUTO_WELCOME_SOURCES = new Set(["meta_ads", "trello"]);
 export type WhatsappChannel = "ativo" | "pago";
 
 /** Deriva o canal de modelo a partir de `Lead.source`. Leads de prospecção
- * ativa (tng_prospeccao/prospeccao) e cadastros manuais usam o canal "ativo"
- * (abordagem do zero); leads de Meta Ads/Trello usam "pago" (já receberam a
- * mensagem de boas-vindas automática, o funil manual começa no diagnóstico). */
+ * ativa (tng_prospeccao/prospeccao) e cadastros manuais usam o canal "ativo";
+ * leads de Meta Ads/Trello usam "pago" (já receberam o aviso automático de
+ * recebimento). Nos dois canais, o funil de contato numerado começa no
+ * diagnóstico (1º contato). */
 export function whatsappChannelForSource(source: string | null | undefined): WhatsappChannel {
   return source && AUTO_WELCOME_SOURCES.has(source) ? "pago" : "ativo";
 }
@@ -210,29 +212,33 @@ const BREAK_OFF_BLOCKS: string[] = [
  * composer, quando o lead está no status X, é a MENSAGEM SEGUINTE a mandar —
  * ou seja, "status = primeiro_contato" já significa "o 1º contato foi feito,
  * a próxima é a nº2"):
- *   1. Primeira abordagem/boas-vindas — automática pra quem chega via Meta
- *      Ads/Trello (boas_vindas_pago), manual pra quem é prospecção ativa
- *      (primeira_abordagem). Só oferece o diagnóstico, não entrega ainda.
- *   2. Diagnóstico (Google e IA) — entrega o valor de verdade, sem precisar
- *      de "sim" antes. Mandatória logo após o 1º contato, pros dois canais.
- *   3. Cobrança do diagnóstico — pergunta se viu, sem pressão.
- *   4. Autoridade/referência na especialidade.
- *   5. Ticket médio + menor dependência de convênio/plano de saúde.
- *   6. Alerta de concorrência (quem está ocupando o espaço hoje).
- *   7. Agenda cheia / mais faturamento, menos ociosidade.
- *   8. Fechamento educado, recapitula tudo, deixa a porta aberta.
+ *   1. Diagnóstico (Google e IA) — o 1º contato já entrega valor de
+ *      verdade, sem precisar de "sim" antes. `primeira_abordagem` e
+ *      `boas_vindas_pago` NÃO fazem mais parte da cadência numerada (ver
+ *      os dois logo abaixo): ficam disponíveis só como alternativa
+ *      opcional/manual, mas o modelo sugerido por padrão pro lead novo, nos
+ *      dois canais, é direto o diagnóstico.
+ *   2. Cobrança do diagnóstico — pergunta se viu, sem pressão.
+ *   3. Autoridade/referência na especialidade.
+ *   4. Ticket médio + menor dependência de convênio/plano de saúde.
+ *   5. Alerta de concorrência (quem está ocupando o espaço hoje).
+ *   6. Agenda cheia / mais faturamento, menos ociosidade.
+ *   7. Prova social — resultado real de outro cliente, como último reforço
+ *      de credibilidade antes do fechamento.
+ *   8. Fechamento educado, recapitula tudo (incluindo a prova social), deixa
+ *      a porta aberta.
  * Esse rótulo com o número do contato aparece também no card do Kanban (ver
  * `nextMessageLabelForLead` em dashboard-client.tsx), pra equipe nunca ter
  * dúvida de qual mensagem mandar em seguida.
  */
 export const WHATSAPP_TEMPLATES: WhatsappTemplate[] = [
-  // ---- Contato 1: abordagem/boas-vindas inicial ----
+  // ---- Fora da cadência numerada: alternativa opcional / aviso automático ----
   {
     id: "primeira_abordagem",
-    label: "1º contato — Primeira abordagem",
+    label: "Abordagem alternativa (opcional, antes do diagnóstico)",
     description:
-      "1º contato (prospecção ativa/manual): confirma que chegou na empresa certa, cita fatores reais do perfil do lead pra criar conexão (se a busca de concorrentes já rodou), destaca ser (ou não) citado pelas IAs, mostra a pesquisa de mercado e oferece o diagnóstico gratuito. Só oferece — quem entrega de fato é o 2º contato.",
-    appliesTo: ["novo_lead"],
+      "Não faz mais parte da cadência numerada — o 1º contato oficial é o diagnóstico, logo abaixo. Use este modelo só se preferir um aquecimento mais suave antes de mandar a análise: confirma que chegou na empresa certa, cita fatores reais do perfil do lead (se a busca de concorrentes já rodou) e só oferece o diagnóstico, sem entregar ainda.",
+    appliesTo: [],
     channel: "ativo",
     text: withSignature(
       `Olá, é da{{#nome}} {{nome}}{{/nome}}{{^nome}} sua empresa{{/nome}}? {{#tem_perfil}}Vi o perfil de vocês no Google{{#avaliacoes}}, com {{avaliacoes}} avaliações{{/avaliacoes}} — muito bacana o retorno que vocês já têm por lá. {{/tem_perfil}}Fiz uma pesquisa e vi que tem{{#buscas}} {{buscas}}{{/buscas}} pessoas procurando por {{#categoria}}{{categoria}}{{/categoria}}{{^categoria}}esse serviço{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} todos os meses no Google. São possíveis pacientes que talvez não estejam te encontrando. E hoje isso vai além do Google: muita gente já pergunta direto pra ferramentas de IA, tipo ChatGPT, qual profissional procurar, e quem não está bem posicionado simplesmente não é citado nessas respostas.{{#concorrente}} Hoje quem aparece na frente {{#categoria}}pra "{{categoria}}{{#cidade}} em {{cidade}}{{/cidade}}"{{/categoria}}{{^categoria}}nessa busca{{/categoria}} é {{concorrente}}{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}}.{{/concorrente}} Preparei um diagnóstico gratuito mostrando esses números reais e o potencial de vocês aparecerem mais nas buscas e nas IAs, e atenderem mais gente. Posso te enviar? Não tem nenhum custo.`
@@ -240,10 +246,10 @@ export const WHATSAPP_TEMPLATES: WhatsappTemplate[] = [
   },
   {
     id: "boas_vindas_pago",
-    label: "1º contato — Boas-vindas (mensagem automática)",
+    label: "Boas-vindas automática (mensagem do sistema)",
     description:
-      "1º contato (Meta Ads/Trello): esta mensagem já é enviada automaticamente assim que o lead chega, o status só avança para 'Primeiro Contato' depois que ela sai. Use este modelo só pra reenviar manualmente, se por algum motivo ela não tiver sido entregue.",
-    appliesTo: ["novo_lead"],
+      "Não conta como um dos 8 contatos — é só o aviso de recebimento enviado automaticamente assim que o lead chega via Meta Ads/Trello, antes de qualquer contato de vendas de verdade. Use este modelo só pra reenviar manualmente, se por algum motivo ela não tiver sido entregue.",
+    appliesTo: [],
     channel: "pago",
     text: `Oi{{#primeiro_nome}}, {{primeiro_nome}}{{/primeiro_nome}}! Aqui é da No Limits Marketing.
 
@@ -252,22 +258,22 @@ Recebemos os seus dados sobre melhorar a visibilidade digital do seu negócio{{#
 Em breve entraremos em contato para apresentar o diagnóstico completo de visibilidade digital do seu negócio.`,
   },
 
-  // ---- Contato 2 em diante: sequência compartilhada pelos dois canais ----
+  // ---- Contato 1 em diante: cadência numerada, compartilhada pelos dois canais ----
   {
     id: "diagnostico_ia",
-    label: "2º contato — Diagnóstico (Google e IA)",
+    label: "1º contato — Diagnóstico (Google e IA)",
     description:
-      "2º contato, obrigatório logo depois do 1º (automático ou manual): entrega o diagnóstico de verdade, com base em buscas reais no Google e nas respostas de ferramentas de IA (ChatGPT), em vez de só oferecer e esperar resposta. Enviado como sequência de mensagens curtas (não texto único) pra soar natural. Tom se ajusta sozinho: parabeniza quem já tem perfil no Google, e só sinaliza pontos de atenção de forma genérica (sem revelar detalhes) pra despertar curiosidade sobre a reunião. Rode a busca de concorrentes antes de enviar pra preencher os dados automaticamente.",
-    appliesTo: ["primeiro_contato"],
+      "1º contato oficial da cadência, pros dois canais: entrega o diagnóstico de verdade já de cara, com base em buscas reais no Google e nas respostas de ferramentas de IA (ChatGPT), em vez de só oferecer e esperar resposta. Enviado como sequência de mensagens curtas (não texto único) pra soar natural. Tom se ajusta sozinho: parabeniza quem já tem perfil no Google, e só sinaliza pontos de atenção de forma genérica (sem revelar detalhes) pra despertar curiosidade sobre a reunião. Rode a busca de concorrentes antes de enviar pra preencher os dados automaticamente.",
+    appliesTo: ["novo_lead"],
     channel: "ambos",
     text: DIAGNOSTICO_IA_BLOCKS.join("\n\n"),
     blocks: DIAGNOSTICO_IA_BLOCKS,
   },
   {
     id: "cobranca_diagnostico",
-    label: "3º contato — Cobrança do diagnóstico",
-    description: "3º contato: pergunta se viu a análise (Google e IA) enviada no 2º contato, sem soar insistente, e oferece reenviar.",
-    appliesTo: ["segundo_contato"],
+    label: "2º contato — Cobrança do diagnóstico",
+    description: "2º contato: pergunta se viu a análise (Google e IA) enviada no 1º contato, sem soar insistente, e oferece reenviar.",
+    appliesTo: ["primeiro_contato"],
     channel: "ambos",
     text: withSignature(
       `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}conseguiu ver a análise que te mandei sobre a presença de vocês no Google e nas buscas por IA? Ela mostra bem onde{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} vocês{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} está perdendo pacientes pro concorrente hoje. Posso separar uns 15 minutos essa semana pra te explicar os números com calma e mostrar como resolvemos isso? Se preferir, me chama que já te reenvio a análise.`
@@ -275,10 +281,10 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
   },
   {
     id: "autoridade_referencia",
-    label: "4º contato — Referência na especialidade",
+    label: "3º contato — Referência na especialidade",
     description:
-      "4º contato: muda o ângulo pra autoridade — mostra que quem investe nisso vira referência na especialidade, não só mais um nome na lista.",
-    appliesTo: ["terceiro_contato"],
+      "3º contato: muda o ângulo pra autoridade — mostra que quem investe nisso vira referência na especialidade, não só mais um nome na lista.",
+    appliesTo: ["segundo_contato"],
     channel: "ambos",
     text: withSignature(
       `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}voltando a insistir, mas com um motivo 🙂 Tenho reparado que {{#categoria}}profissionais de {{categoria}}{{/categoria}}{{^categoria}}profissionais{{/categoria}} que aparecem bem no Google e nas respostas de IA acabam virando a referência{{#cidade}} em {{cidade}}{{/cidade}} — o nome que todo mundo lembra e indica, não só mais um da lista. É exatamente esse caminho que a análise que te mandei aponta: onde vocês estão hoje e o que falta pra chegar lá. Ainda faz sentido a gente conversar sobre isso?`
@@ -286,10 +292,10 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
   },
   {
     id: "ticket_medio_convenio",
-    label: "5º contato — Ticket médio e convênios",
+    label: "4º contato — Ticket médio e convênios",
     description:
-      "5º contato: cita o resultado de negócio (ticket médio maior, menos dependência de convênio/plano de saúde) que outros clientes já colhem ao virar referência.",
-    appliesTo: ["quarto_contato"],
+      "4º contato: cita o resultado de negócio (ticket médio maior, menos dependência de convênio/plano de saúde) que outros clientes já colhem ao virar referência.",
+    appliesTo: ["terceiro_contato"],
     channel: "ambos",
     text: withSignature(
       `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}um dado que talvez ajude a decidir: boa parte dos nossos clientes, à medida que se tornam referência na região, conseguem aumentar o ticket médio e depender menos de convênio/plano de saúde, porque passam a atrair paciente particular direto pela reputação online, não só por indicação. Isso conecta direto com o que te mostrei na análise{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}: dá pra reproduzir esse caminho com vocês também. Posso separar 15 minutos pra te mostrar como, na prática?`
@@ -297,10 +303,10 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
   },
   {
     id: "alerta_concorrencia",
-    label: "6º contato — Alerta de concorrência",
+    label: "5º contato — Alerta de concorrência",
     description:
-      "6º contato: usa o gancho de perda — concorrente menos preparado ocupando o espaço de vocês no Google/IA. Preenche automaticamente se a busca de concorrentes já rodou.",
-    appliesTo: ["quinto_contato"],
+      "5º contato: usa o gancho de perda — concorrente menos preparado ocupando o espaço de vocês no Google/IA. Preenche automaticamente se a busca de concorrentes já rodou.",
+    appliesTo: ["quarto_contato"],
     channel: "ambos",
     text: withSignature(
       `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}vou direto ao ponto: {{#concorrente}}hoje é {{concorrente}}{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}} quem aparece{{/concorrente}}{{^concorrente}}tem concorrente com bem menos experiência aparecendo{{/concorrente}} na frente {{#categoria}}quando alguém procura {{categoria}}{{/categoria}}{{^categoria}}nessa busca{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}, tanto no Google quanto nas respostas de ferramentas de IA. Isso já apareceu na análise que te mandei. Na prática, é paciente escolhendo um profissional com menos preparo só porque ele aparece primeiro. Ainda dá tempo de reverter, mas quanto mais tempo passa, mais essa posição se consolida. Vale 10 minutos ainda essa semana?`
@@ -308,24 +314,35 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
   },
   {
     id: "agenda_cheia",
-    label: "7º contato — Agenda cheia",
+    label: "6º contato — Agenda cheia",
     description:
-      "7º contato: fecha com o resultado final que a agência entrega (agenda mais cheia, mais faturamento, menos ociosidade), sem soar como se fosse a última tentativa — ainda tem o 8º.",
-    appliesTo: ["sexto_contato"],
+      "6º contato: fecha com o resultado final que a agência entrega (agenda mais cheia, mais faturamento, menos ociosidade), sem soar como se fosse a última tentativa — ainda tem o 7º e o 8º.",
+    appliesTo: ["quinto_contato"],
     channel: "ambos",
     text: withSignature(
       `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}sei que já mandei algumas mensagens por aqui — prometo que estou quase parando de insistir 😅 Só queria reforçar o resultado final de tudo isso: o que os clientes que aplicam esse diagnóstico têm em comum é agenda mais cheia, mais faturamento e menos tempo ocioso entre um atendimento e outro. Ainda posso te mostrar como chegar nisso, sem custo algum{{#categoria}}, pra {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}. Faz sentido a gente conversar essa semana?`
     ),
   },
   {
+    id: "prova_social",
+    label: "7º contato — Prova social",
+    description:
+      "7º contato: fortalece a credibilidade citando resultado real de outro cliente que aplicou o mesmo diagnóstico, como último reforço antes do fechamento.",
+    appliesTo: ["sexto_contato"],
+    channel: "ambos",
+    text: withSignature(
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}só um exemplo rápido pra ilustrar: outros clientes nossos{{#categoria}}, também de {{categoria}}{{/categoria}}, aplicaram exatamente esse diagnóstico e em poucos meses já apareciam entre os primeiros resultados do Google{{#cidade}} em {{cidade}}{{/cidade}} e passaram a ser citados nas respostas de IA — o que se traduz direto em mais paciente novo chegando sem precisar de indicação. É esse mesmo caminho que mapeamos pra vocês na análise que te mandei. Topa que eu te mostre como replicar isso aí?`
+    ),
+  },
+  {
     id: "oitavo_contato",
     label: "8º contato — Fechamento educado",
     description:
-      "8º e último contato da sequência: recapitula tudo que já foi mostrado (diagnóstico, concorrência, referência, ticket médio, agenda) e dá uma saída elegante, deixando a porta aberta caso o lead volte a ser prioridade.",
+      "8º e último contato da sequência: recapitula tudo que já foi mostrado (diagnóstico, concorrência, referência, ticket médio, agenda, prova social) e dá uma saída elegante, deixando a porta aberta caso o lead volte a ser prioridade.",
     appliesTo: ["setimo_contato"],
     channel: "ambos",
     text: withSignature(
-      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}essa realmente é a minha última mensagem por aqui, não quero encher seu WhatsApp à toa 🙂 Deixo resumido o que te mostrei nesse tempo: a análise de presença{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} no Google e nas IAs, o espaço que hoje está sendo ocupado por outros profissionais, e o caminho pra vocês virarem referência na região, aumentando o ticket médio e a agenda. Se em algum momento isso virar prioridade, é só me chamar que retomamos de onde paramos. Fico na torcida pelo sucesso de vocês de qualquer forma!`
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}essa realmente é a minha última mensagem por aqui, não quero encher seu WhatsApp à toa 🙂 Deixo resumido o que te mostrei nesse tempo: a análise de presença{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} no Google e nas IAs, o espaço que hoje está sendo ocupado por outros profissionais, os resultados reais que outros clientes já tiveram com esse caminho, e como vocês também podem virar referência na região, aumentando o ticket médio e a agenda. Se em algum momento isso virar prioridade, é só me chamar que retomamos de onde paramos. Fico na torcida pelo sucesso de vocês de qualquer forma!`
     ),
   },
   {
