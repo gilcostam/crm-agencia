@@ -272,11 +272,12 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
   {
     id: "cobranca_diagnostico",
     label: "2º contato: Cobrança do diagnóstico",
-    description: "2º contato: pergunta se viu a análise (Google e IA) enviada no 1º contato, sem soar insistente, e oferece reenviar.",
+    description:
+      "2º contato: pergunta se viu a análise (Google e IA) enviada no 1º contato, sem soar insistente, e oferece reenviar. Tom neutro de propósito (não assume 'está perdendo pacientes'), porque o diagnóstico do 1º contato pode ter sido positivo (já tem perfil, só falta otimizar) ou de alerta, dependendo do lead.",
     appliesTo: ["primeiro_contato"],
     channel: "ambos",
     text: withSignature(
-      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}conseguiu ver a análise que te mandei sobre a presença de vocês no Google e nas buscas por IA? Ela mostra bem onde{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} vocês{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} está perdendo pacientes pro concorrente hoje. Posso separar uns 15 minutos essa semana pra te explicar os números com calma e mostrar como resolvemos isso? Se preferir, me chama que já te reenvio a análise.`
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}conseguiu dar uma olhada no diagnóstico que te mandei sobre a presença de vocês no Google e nas buscas por IA? Ele mostra onde{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} vocês{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} está hoje nessas buscas e o que dá pra fazer pra ocupar as primeiras posições, sem precisar de anúncio pago. Posso separar uns 15 minutos essa semana pra te mostrar os números com calma? Se preferir, me chama que já te reenvio o diagnóstico.`
     ),
   },
   {
