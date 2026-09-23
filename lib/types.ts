@@ -3,6 +3,10 @@ export type LeadStatus =
   | "primeiro_contato"
   | "segundo_contato"
   | "terceiro_contato"
+  | "quarto_contato"
+  | "quinto_contato"
+  | "sexto_contato"
+  | "setimo_contato"
   | "reuniao_marcada"
   | "no_show"
   | "diagnostico_enviado"
@@ -68,6 +72,10 @@ export const STATUS_LABELS: Record<LeadStatus, string> = {
   primeiro_contato: "Primeiro Contato",
   segundo_contato: "Segundo Contato",
   terceiro_contato: "Terceiro Contato",
+  quarto_contato: "Quarto Contato",
+  quinto_contato: "Quinto Contato",
+  sexto_contato: "Sexto Contato",
+  setimo_contato: "Sétimo Contato",
   reuniao_marcada: "Reunião Marcada",
   no_show: "No Show",
   diagnostico_enviado: "Diagnóstico Enviado",
@@ -82,6 +90,10 @@ export const STATUS_ORDER: LeadStatus[] = [
   "primeiro_contato",
   "segundo_contato",
   "terceiro_contato",
+  "quarto_contato",
+  "quinto_contato",
+  "sexto_contato",
+  "setimo_contato",
   "reuniao_marcada",
   "no_show",
   "diagnostico_enviado",

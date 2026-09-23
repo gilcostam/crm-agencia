@@ -14,6 +14,10 @@ create table if not exists public.leads (
       'primeiro_contato',
       'segundo_contato',
       'terceiro_contato',
+      'quarto_contato',
+      'quinto_contato',
+      'sexto_contato',
+      'setimo_contato',
       'reuniao_marcada',
       'no_show',
       'diagnostico_enviado',
@@ -295,3 +299,31 @@ alter table public.leads
 -- external_key = "instagram:<handle>" (mesmo índice único já existente).
 alter table public.leads
   add column if not exists instagram text;
+
+-- Cadência de 8 contatos (prospecção fria/lead que ainda não respondeu):
+-- adiciona "quarto_contato" a "setimo_contato" entre o terceiro contato e a
+-- reunião marcada, cada um com um ângulo de persuasão diferente (autoridade,
+-- ticket médio/convênio, concorrência, agenda cheia — ver
+-- lib/whatsapp-templates.ts). Isso muda a constraint de status, então
+-- precisa recriar o check (a definição original em create table já está
+-- atualizada acima, isso aqui é só pra bases que já existiam antes dela).
+alter table public.leads drop constraint if exists leads_status_check;
+alter table public.leads add constraint leads_status_check check (
+  status in (
+    'novo_lead',
+    'primeiro_contato',
+    'segundo_contato',
+    'terceiro_contato',
+    'quarto_contato',
+    'quinto_contato',
+    'sexto_contato',
+    'setimo_contato',
+    'reuniao_marcada',
+    'no_show',
+    'diagnostico_enviado',
+    'contrato_assinado',
+    'retornar_depois',
+    'finalizado',
+    'desqualificado'
+  )
+);

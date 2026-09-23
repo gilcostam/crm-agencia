@@ -13,6 +13,10 @@ const AUTO_FOLLOWUP_STATUSES: LeadStatus[] = [
   "primeiro_contato",
   "segundo_contato",
   "terceiro_contato",
+  "quarto_contato",
+  "quinto_contato",
+  "sexto_contato",
+  "setimo_contato",
   "no_show",
 ];
 

@@ -210,11 +210,11 @@ export const WHATSAPP_TEMPLATES: WhatsappTemplate[] = [
     id: "primeira_abordagem",
     label: "Primeira abordagem",
     description:
-      "1º contato: confirma que chegou na empresa certa, destaca ser (ou não) citado pelas IAs, mostra a pesquisa de mercado e oferece o diagnóstico gratuito.",
+      "1º contato: confirma que chegou na empresa certa, cita fatores reais do perfil do lead pra criar conexão (se a busca de concorrentes já rodou), destaca ser (ou não) citado pelas IAs, mostra a pesquisa de mercado e oferece o diagnóstico gratuito.",
     appliesTo: ["novo_lead", "primeiro_contato"],
     channel: "ativo",
     text: withSignature(
-      `Olá, é da{{#nome}} {{nome}}{{/nome}}{{^nome}} sua empresa{{/nome}}? Fiz uma pesquisa e vi que tem{{#buscas}} {{buscas}}{{/buscas}} pessoas procurando por {{#categoria}}{{categoria}}{{/categoria}}{{^categoria}}esse serviço{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} todos os meses no Google. São possíveis pacientes que talvez não estejam te encontrando. E hoje isso vai além do Google: muita gente já pergunta direto pra ferramentas de IA, tipo ChatGPT, qual profissional procurar, e quem não está bem posicionado simplesmente não é citado nessas respostas. Preparei um diagnóstico gratuito mostrando esses números reais e o potencial de vocês aparecerem mais nas buscas e nas IAs, e atenderem mais gente. Posso te enviar? Não tem nenhum custo.`
+      `Olá, é da{{#nome}} {{nome}}{{/nome}}{{^nome}} sua empresa{{/nome}}? {{#tem_perfil}}Vi o perfil de vocês no Google{{#avaliacoes}}, com {{avaliacoes}} avaliações{{/avaliacoes}} — muito bacana o retorno que vocês já têm por lá. {{/tem_perfil}}Fiz uma pesquisa e vi que tem{{#buscas}} {{buscas}}{{/buscas}} pessoas procurando por {{#categoria}}{{categoria}}{{/categoria}}{{^categoria}}esse serviço{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} todos os meses no Google. São possíveis pacientes que talvez não estejam te encontrando. E hoje isso vai além do Google: muita gente já pergunta direto pra ferramentas de IA, tipo ChatGPT, qual profissional procurar, e quem não está bem posicionado simplesmente não é citado nessas respostas.{{#concorrente}} Hoje quem aparece na frente {{#categoria}}pra "{{categoria}}{{#cidade}} em {{cidade}}{{/cidade}}"{{/categoria}}{{^categoria}}nessa busca{{/categoria}} é {{concorrente}}{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}}.{{/concorrente}} Preparei um diagnóstico gratuito mostrando esses números reais e o potencial de vocês aparecerem mais nas buscas e nas IAs, e atenderem mais gente. Posso te enviar? Não tem nenhum custo.`
     ),
   },
   {
@@ -230,11 +230,55 @@ export const WHATSAPP_TEMPLATES: WhatsappTemplate[] = [
   {
     id: "terceiro_contato",
     label: "Terceiro contato (follow-up)",
-    description: "3º e último contato da sequência: tom mais direto, sem pressão, antes de encerrar a abordagem.",
+    description: "3º contato: tom mais direto, sem pressão, reforçando o valor do diagnóstico gratuito.",
     appliesTo: ["terceiro_contato"],
     channel: "ativo",
     text: withSignature(
-      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}tudo bem? Essa é minha última tentativa por aqui, não quero incomodar 🙂 O diagnóstico gratuito que preparei continua disponível, mostrando o potencial de {{#categoria}}{{categoria}}{{/categoria}}{{^categoria}}vocês{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} pra atrair mais pacientes pelo Google. Se fizer sentido, me chama que te envio agora. Se preferir não seguir por aqui, sem problema nenhum.`
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}tudo bem? Sei que a rotina é corrida, não quero incomodar 🙂 O diagnóstico gratuito que preparei continua disponível, mostrando o potencial de {{#categoria}}{{categoria}}{{/categoria}}{{^categoria}}vocês{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} pra atrair mais pacientes pelo Google. Se fizer sentido, me chama que te envio agora.`
+    ),
+  },
+  {
+    id: "quarto_contato",
+    label: "Quarto contato (referência na especialidade)",
+    description:
+      "4º contato: muda o ângulo pra autoridade — mostra que quem investe nisso vira referência na especialidade, não só mais um nome na lista.",
+    appliesTo: ["quarto_contato"],
+    channel: "ambos",
+    text: withSignature(
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}voltando a insistir, mas com um motivo 🙂 Tenho reparado que {{#categoria}}profissionais de {{categoria}}{{/categoria}}{{^categoria}}profissionais{{/categoria}} que aparecem bem no Google e nas respostas de IA acabam virando a referência{{#cidade}} em {{cidade}}{{/cidade}} — o nome que todo mundo lembra e indica, não só mais um da lista. É exatamente esse caminho que o diagnóstico gratuito mostra: onde vocês estão hoje e o que falta pra chegar lá. Ainda faz sentido eu te enviar?`
+    ),
+  },
+  {
+    id: "quinto_contato",
+    label: "Quinto contato (ticket médio e convênios)",
+    description:
+      "5º contato: cita o resultado de negócio (ticket médio maior, menos dependência de convênio/plano de saúde) que outros clientes já colhem ao virar referência.",
+    appliesTo: ["quinto_contato"],
+    channel: "ambos",
+    text: withSignature(
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}um dado que talvez ajude a decidir: boa parte dos nossos clientes, à medida que se tornam referência na região, conseguem aumentar o ticket médio e depender menos de convênio/plano de saúde, porque passam a atrair paciente particular direto pela reputação online, não só por indicação. É esse tipo de resultado que o diagnóstico gratuito{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} ajuda a mapear: o ponto de partida de vocês hoje. Posso te mandar, sem custo?`
+    ),
+  },
+  {
+    id: "sexto_contato",
+    label: "Sexto contato (alerta de concorrência)",
+    description:
+      "6º contato: usa o gancho de perda — concorrente menos preparado ocupando o espaço de vocês no Google/IA. Preenche automaticamente se a busca de concorrentes já rodou.",
+    appliesTo: ["sexto_contato"],
+    channel: "ambos",
+    text: withSignature(
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}vou direto ao ponto: {{#concorrente}}hoje é {{concorrente}}{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}} quem aparece{{/concorrente}}{{^concorrente}}tem concorrente com bem menos experiência aparecendo{{/concorrente}} na frente {{#categoria}}quando alguém procura {{categoria}}{{/categoria}}{{^categoria}}nessa busca{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}, tanto no Google quanto nas respostas de ferramentas de IA. Na prática, é paciente escolhendo um profissional com menos preparo só porque ele aparece primeiro. O diagnóstico que preparei mostra exatamente como reverter isso. Vale 10 minutos ainda essa semana?`
+    ),
+  },
+  {
+    id: "setimo_contato",
+    label: "Sétimo contato (agenda cheia, sem pressão)",
+    description:
+      "7º e último contato da sequência: fecha com o resultado final (agenda cheia, mais faturamento, menos ociosidade) e dá saída elegante caso não haja retorno.",
+    appliesTo: ["setimo_contato"],
+    channel: "ambos",
+    text: withSignature(
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}essa é a última mensagem que mando por aqui sobre isso, prometo 🙂 O que os clientes que aplicaram esse diagnóstico têm em comum hoje é agenda mais cheia: mais faturamento e menos tempo ocioso entre um atendimento e outro. É esse resultado que quero te mostrar, sem custo{{#categoria}}, pra {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}. Se fizer sentido, me chama que te envio agora. Se não for o momento, sem problema, só me avisa que eu não insisto mais.`
     ),
   },
   {
