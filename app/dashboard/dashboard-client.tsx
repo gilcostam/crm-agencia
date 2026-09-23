@@ -14,8 +14,23 @@ import {
   followupUrgency,
 } from "@/lib/types";
 import { sanitizePhone } from "@/lib/phone";
+import { defaultTemplateIdForStatus, getTemplate, whatsappChannelForSource } from "@/lib/whatsapp-templates";
 import WhatsAppComposerModal from "./_components/WhatsAppComposerModal";
 import InstagramComposerModal from "./_components/InstagramComposerModal";
+
+/** Rótulo da próxima mensagem a enviar pro lead, pra deixar visível no card
+ * do Kanban (ver lib/whatsapp-templates.ts pra o desenho completo da
+ * cadência de 8 contatos). Usa o mesmo cálculo do composer
+ * (defaultTemplateIdForStatus), então o card sempre mostra exatamente o
+ * modelo que abriria por padrão ao clicar em "Conversar no WhatsApp".
+ * `null` pra status fora da cadência de contato (ex.: Contrato Assinado),
+ * onde não faz sentido sugerir uma mensagem fixa. */
+function nextMessageLabelForLead(lead: Lead): string | null {
+  const channel = whatsappChannelForSource(lead.source);
+  const templateId = defaultTemplateIdForStatus(lead.status, channel);
+  if (templateId === "personalizada") return null;
+  return getTemplate(templateId).label;
+}
 
 const POLL_INTERVAL_MS = 4000;
 const STALE_STATUSES: LeadStatus[] = [
@@ -389,6 +404,12 @@ function LeadDetailModal({
             ✕
           </button>
         </div>
+
+        {nextMessageLabelForLead(lead) && (
+          <div className="mb-4 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-800">
+            ➜ Próxima mensagem a enviar: <strong>{nextMessageLabelForLead(lead)}</strong>
+          </div>
+        )}
 
         {duplicateLeads.length > 0 && (
           <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
@@ -1833,6 +1854,7 @@ export default function DashboardClient({
                       STALE_STATUSES.includes(lead.status) &&
                       daysSince(lead.updated_at) >= STALE_DAYS_THRESHOLD;
                     const duplicates = duplicatesOf(lead);
+                    const nextMessage = nextMessageLabelForLead(lead);
                     return (
                       <div
                         key={lead.id}
@@ -1891,6 +1913,11 @@ export default function DashboardClient({
                           <p className="truncate text-xs text-neutral-500">
                             {lead.city}
                             {lead.category ? ` · ${lead.category}` : ""}
+                          </p>
+                        )}
+                        {nextMessage && (
+                          <p className="mt-1 truncate text-[10px] font-medium text-indigo-700">
+                            ➜ Próxima msg: {nextMessage}
                           </p>
                         )}
                         {lead.status === "novo_lead" && lead.category && lead.city && (
