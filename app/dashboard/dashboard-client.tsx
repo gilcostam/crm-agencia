@@ -1004,7 +1004,8 @@ function InstagramImportModal({ onClose, onSubmit, submitting }: InstagramImport
 
         <p className="mb-3 text-xs text-neutral-500">
           Cole uma URL ou @handle do Instagram por linha. Opcionalmente, acrescente nome,
-          categoria e cidade separados por ponto e vírgula:
+          categoria e cidade separados por ponto e vírgula. Se a lista já estiver numa
+          planilha, use o botão "Importar planilha do Instagram" no lugar deste.
         </p>
         <pre className="mb-3 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-[11px] text-neutral-500">
           https://www.instagram.com/fulano/;Fulano da Silva;Odontologia;Catanduva{"\n"}
@@ -1047,6 +1048,7 @@ export default function DashboardClient({
   pollQuery = "",
   enableTngImport = false,
   enableInstagramImport = false,
+  enableInstagramSheetImport = false,
 }: {
   initialLeads: Lead[];
   /** Título exibido no cabeçalho da página (ex.: "Prospecção Ativa" na tela
@@ -1061,9 +1063,14 @@ export default function DashboardClient({
   /** Mostra o botão "Importar CSV do TNG Pesquisa" no toolbar — só faz
    * sentido na tela de Prospecção Ativa (ver app/dashboard/prospeccao/page.tsx). */
   enableTngImport?: boolean;
-  /** Mostra o botão "Importar leads do Instagram" no toolbar — mesmo
-   * critério do enableTngImport, só na tela de Prospecção Ativa. */
+  /** Mostra o botão "Importar leads do Instagram" (colar texto, um perfil
+   * por linha) no toolbar — mesmo critério do enableTngImport, só na tela de
+   * Prospecção Ativa. */
   enableInstagramImport?: boolean;
+  /** Mostra o botão "Importar planilha do Instagram" (upload de CSV) no
+   * toolbar — alternativa ao enableInstagramImport pra quem já tem a lista
+   * de perfis numa planilha, mesmo critério de tela. */
+  enableInstagramSheetImport?: boolean;
 }) {
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -1094,6 +1101,15 @@ export default function DashboardClient({
   const [instagramImportError, setInstagramImportError] = useState<string | null>(null);
   const [instagramImportResult, setInstagramImportResult] = useState<{
     totalLines: number;
+    skippedInvalid: number;
+    mergedCount: number;
+    imported: number;
+  } | null>(null);
+  const instagramSheetFileInputRef = useRef<HTMLInputElement>(null);
+  const [importingInstagramSheet, setImportingInstagramSheet] = useState(false);
+  const [instagramSheetImportError, setInstagramSheetImportError] = useState<string | null>(null);
+  const [instagramSheetImportResult, setInstagramSheetImportResult] = useState<{
+    totalRows: number;
     skippedInvalid: number;
     mergedCount: number;
     imported: number;
@@ -1224,6 +1240,15 @@ export default function DashboardClient({
     return () => clearTimeout(timeout);
   }, [instagramImportResult, instagramImportError]);
 
+  useEffect(() => {
+    if (!instagramSheetImportResult && !instagramSheetImportError) return;
+    const timeout = setTimeout(() => {
+      setInstagramSheetImportResult(null);
+      setInstagramSheetImportError(null);
+    }, 15000);
+    return () => clearTimeout(timeout);
+  }, [instagramSheetImportResult, instagramSheetImportError]);
+
   async function handleInstagramImportSubmit(text: string) {
     setImportingInstagram(true);
     setInstagramImportError(null);
@@ -1276,6 +1301,34 @@ export default function DashboardClient({
     } finally {
       setImportingTng(false);
       if (tngFileInputRef.current) tngFileInputRef.current.value = "";
+    }
+  }
+
+  async function handleInstagramSheetCsvChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportingInstagramSheet(true);
+    setInstagramSheetImportError(null);
+    setInstagramSheetImportResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/leads/import-instagram-sheet", { method: "POST", body: formData });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data) {
+        setInstagramSheetImportError(data?.error || "Erro ao importar a planilha.");
+      } else {
+        setInstagramSheetImportResult(data);
+        await refresh();
+      }
+    } catch {
+      setInstagramSheetImportError("Erro de conexão ao importar a planilha.");
+    } finally {
+      setImportingInstagramSheet(false);
+      if (instagramSheetFileInputRef.current) instagramSheetFileInputRef.current.value = "";
     }
   }
 
@@ -1691,6 +1744,49 @@ export default function DashboardClient({
           </div>
         )}
 
+        {enableInstagramSheetImport && (instagramSheetImportResult || instagramSheetImportError) && (
+          <div
+            className={`mb-5 flex items-center justify-between rounded-md border px-4 py-2.5 text-sm ${
+              instagramSheetImportError
+                ? "border-red-300 bg-red-50 text-red-800"
+                : "border-emerald-300 bg-emerald-50 text-emerald-800"
+            }`}
+          >
+            <span>
+              {instagramSheetImportError
+                ? `❌ ${instagramSheetImportError}`
+                : instagramSheetImportResult && (
+                    <>
+                      ✅ Planilha do Instagram importada:{" "}
+                      <strong>{instagramSheetImportResult.imported}</strong> leads
+                      criados/atualizados de {instagramSheetImportResult.totalRows} linhas
+                      {instagramSheetImportResult.skippedInvalid > 0
+                        ? ` (${instagramSheetImportResult.skippedInvalid} inválidas, puladas)`
+                        : ""}
+                      {instagramSheetImportResult.mergedCount > 0
+                        ? ` (${instagramSheetImportResult.mergedCount} perfis duplicados agrupados)`
+                        : ""}
+                      .
+                    </>
+                  )}
+            </span>
+            <button
+              onClick={() => {
+                setInstagramSheetImportResult(null);
+                setInstagramSheetImportError(null);
+              }}
+              className={`ml-3 shrink-0 ${
+                instagramSheetImportError
+                  ? "text-red-500 hover:text-red-900"
+                  : "text-emerald-500 hover:text-emerald-900"
+              }`}
+              aria-label="Fechar aviso"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         <div className="mb-5 flex flex-wrap items-center gap-3">
           <input
             type="search"
@@ -1789,6 +1885,25 @@ export default function DashboardClient({
             >
               {importingInstagram ? "Importando..." : "Importar leads do Instagram"}
             </button>
+          )}
+          {enableInstagramSheetImport && (
+            <>
+              <input
+                ref={instagramSheetFileInputRef}
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={handleInstagramSheetCsvChange}
+              />
+              <button
+                onClick={() => instagramSheetFileInputRef.current?.click()}
+                disabled={importingInstagramSheet}
+                title="A planilha precisa ter uma coluna com o perfil/URL do Instagram (ex.: 'instagram', 'perfil' ou 'link'); nome, categoria, cidade e telefone são opcionais."
+                className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {importingInstagramSheet ? "Importando..." : "Importar planilha do Instagram"}
+              </button>
+            </>
           )}
           <button
             onClick={() => setShowNewLeadModal(true)}

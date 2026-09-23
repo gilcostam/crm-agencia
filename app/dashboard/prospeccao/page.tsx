@@ -34,6 +34,7 @@ export default async function ProspeccaoPage() {
       pollQuery={`source=${ACTIVE_PROSPECTING_SOURCES.join(",")}`}
       enableTngImport
       enableInstagramImport
+      enableInstagramSheetImport
     />
   );
 }

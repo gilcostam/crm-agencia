@@ -14,6 +14,8 @@
  *   situação do site;nota;avaliações;perfil verificado
  */
 
+import { parseDelimited, toRecords } from "./csv";
+
 export interface TngLeadRow {
   external_key: string;
   full_name: string | null;
@@ -34,73 +36,6 @@ export interface ParseTngCsvResult {
   totalRows: number;
   skippedNoPhone: number;
   mergedCount: number;
-}
-
-/** Parser CSV genérico com suporte a campos entre aspas (inclusive contendo
- * o próprio delimitador ou aspas escapadas como ""), igual ao módulo `csv`
- * do Python. Também remove um BOM UTF-8 no início do texto, se existir. */
-function parseDelimited(text: string, delimiter: string): string[][] {
-  if (text.charCodeAt(0) === 0xfeff) {
-    text = text.slice(1);
-  }
-
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-
-    if (inQuotes) {
-      if (c === '"') {
-        if (text[i + 1] === '"') {
-          field += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        field += c;
-      }
-      continue;
-    }
-
-    if (c === '"') {
-      inQuotes = true;
-    } else if (c === delimiter) {
-      row.push(field);
-      field = "";
-    } else if (c === "\r") {
-      // ignora — o \n logo em seguida fecha a linha
-    } else if (c === "\n") {
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = "";
-    } else {
-      field += c;
-    }
-  }
-
-  if (field.length > 0 || row.length > 0) {
-    row.push(field);
-    rows.push(row);
-  }
-
-  return rows.filter((r) => !(r.length === 1 && r[0] === ""));
-}
-
-function toRecords(rows: string[][]): Record<string, string>[] {
-  if (rows.length === 0) return [];
-  const header = rows[0];
-  return rows.slice(1).map((row) => {
-    const record: Record<string, string> = {};
-    header.forEach((key, i) => {
-      record[key] = row[i] ?? "";
-    });
-    return record;
-  });
 }
 
 // Endereço vem como "R. Ceará, 1048 - Centro, Catanduva - SP, 15800-003" — a
