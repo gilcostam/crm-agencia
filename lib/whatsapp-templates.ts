@@ -17,14 +17,15 @@ import { LeadStatus } from "./types";
  * Existem dois "canais" de modelo (ver `WhatsappChannel`):
  *  - "ativo": leads de prospecção ativa (fonte tng_prospeccao/prospeccao) ou
  *    cadastrados manualmente. Ninguém mandou nada pra esse lead ainda: o
- *    1º contato já é o diagnóstico (ver doc da cadência mais abaixo).
+ *    1º contato já é a análise (ver doc da cadência mais abaixo).
  *  - "pago": leads que chegam por Meta Ads ou Trello (ver
  *    ACTIVE_PROSPECTING_SOURCES/whatsappChannelForSource) e que já recebem,
  *    automaticamente, uma mensagem de boas-vindas assim que entram no CRM
  *    (ver lib/whatsapp-automation.ts:triggerWhatsappSequence, disparada pelos
  *    webhooks do Meta e do Trello). Essa boas-vindas é só um aviso de
  *    recebimento, não conta como um dos 8 contatos da cadência. O 1º
- *    contato de verdade, pros dois canais, é o diagnóstico.
+ *    contato de verdade, pros dois canais, é a análise (o diagnóstico
+ *    completo só acontece ao vivo, na reunião).
  */
 
 /** Placeholders aceitos nos templates abaixo. */
@@ -124,8 +125,8 @@ export type WhatsappChannel = "ativo" | "pago";
 /** Deriva o canal de modelo a partir de `Lead.source`. Leads de prospecção
  * ativa (tng_prospeccao/prospeccao) e cadastros manuais usam o canal "ativo";
  * leads de Meta Ads/Trello usam "pago" (já receberam o aviso automático de
- * recebimento). Nos dois canais, o funil de contato numerado começa no
- * diagnóstico (1º contato). */
+ * recebimento). Nos dois canais, o funil de contato numerado começa na
+ * análise (1º contato). */
 export function whatsappChannelForSource(source: string | null | undefined): WhatsappChannel {
   return source && AUTO_WELCOME_SOURCES.has(source) ? "pago" : "ativo";
 }
@@ -172,7 +173,8 @@ function withSignature(text: string): string {
  *    base pra ranquear, falta só otimizar.
  *  - Se não tem perfil, ou não tem site (`tem_site`), sinaliza como "ponto
  *    de atenção" de forma genérica, sem revelar qual é o problema (a ideia é
- *    despertar curiosidade, não dar o diagnóstico de graça por texto).
+ *    despertar curiosidade, não entregar o diagnóstico completo de graça
+ *    por texto, isso só acontece ao vivo, na reunião).
  *  - Sempre fecha com o gancho da reunião: mostrar ao vivo, no mapa da
  *    cidade, as oportunidades que não estão sendo aproveitadas, sem precisar
  *    de anúncio pago.
@@ -194,7 +196,7 @@ const DIAGNOSTICO_IA_BLOCKS: string[] = [
  * sem fechar a porta. Dividida em blocos curtos, no mesmo espírito de
  * DIAGNOSTICO_IA_BLOCKS, pra soar como uma despedida natural e não um aviso
  * automático. Nunca cita concorrente específico (só "os concorrentes",
- * genérico) porque, diferente do diagnóstico, aqui não necessariamente
+ * genérico) porque, diferente da análise, aqui não necessariamente
  * rodamos uma busca fresca antes de mandar, citar nome exigiria conferir o
  * dado na hora (ver skill abordagem-lead-formulario).
  */
@@ -212,13 +214,14 @@ const BREAK_OFF_BLOCKS: string[] = [
  * composer, quando o lead está no status X, é a MENSAGEM SEGUINTE a mandar,
  * ou seja, "status = primeiro_contato" já significa "o 1º contato foi feito,
  * a próxima é a nº2"):
- *   1. Diagnóstico (Google e IA): o 1º contato já entrega valor de
- *      verdade, sem precisar de "sim" antes. `primeira_abordagem` e
- *      `boas_vindas_pago` NÃO fazem mais parte da cadência numerada (ver
- *      os dois logo abaixo): ficam disponíveis só como alternativa
- *      opcional/manual, mas o modelo sugerido por padrão pro lead novo, nos
- *      dois canais, é direto o diagnóstico.
- *   2. Cobrança do diagnóstico: pergunta se viu, sem pressão.
+ *   1. Análise (Google e IA): o 1º contato já entrega valor de
+ *      verdade, sem precisar de "sim" antes (é uma análise rápida por
+ *      texto, o diagnóstico completo só acontece ao vivo, na reunião).
+ *      `primeira_abordagem` e `boas_vindas_pago` NÃO fazem mais parte da
+ *      cadência numerada (ver os dois logo abaixo): ficam disponíveis só
+ *      como alternativa opcional/manual, mas o modelo sugerido por padrão
+ *      pro lead novo, nos dois canais, é direto a análise.
+ *   2. Cobrança da análise: pergunta se viu, sem pressão.
  *   3. Autoridade/referência na especialidade.
  *   4. Ticket médio + menor dependência de convênio/plano de saúde.
  *   5. Alerta de concorrência (quem está ocupando o espaço hoje).
@@ -235,13 +238,13 @@ export const WHATSAPP_TEMPLATES: WhatsappTemplate[] = [
   // ---- Fora da cadência numerada: alternativa opcional / aviso automático ----
   {
     id: "primeira_abordagem",
-    label: "Abordagem alternativa (opcional, antes do diagnóstico)",
+    label: "Abordagem alternativa (opcional, antes da análise)",
     description:
-      "Não faz mais parte da cadência numerada: o 1º contato oficial é o diagnóstico, logo abaixo. Use este modelo só se preferir um aquecimento mais suave antes de mandar a análise: confirma que chegou na empresa certa, cita fatores reais do perfil do lead (se a busca de concorrentes já rodou) e só oferece o diagnóstico, sem entregar ainda.",
+      "Não faz mais parte da cadência numerada: o 1º contato oficial é a análise, logo abaixo. Use este modelo só se preferir um aquecimento mais suave antes de mandar a análise: confirma que chegou na empresa certa, cita fatores reais do perfil do lead (se a busca de concorrentes já rodou) e só oferece a análise, sem entregar ainda.",
     appliesTo: [],
     channel: "ativo",
     text: withSignature(
-      `Olá, é da{{#nome}} {{nome}}{{/nome}}{{^nome}} sua empresa{{/nome}}? {{#tem_perfil}}Vi o perfil de vocês no Google{{#avaliacoes}}, com {{avaliacoes}} avaliações{{/avaliacoes}}, muito bacana o retorno que vocês já têm por lá. {{/tem_perfil}}Fiz uma pesquisa e vi que tem{{#buscas}} {{buscas}}{{/buscas}} pessoas procurando por {{#categoria}}{{categoria}}{{/categoria}}{{^categoria}}esse serviço{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} todos os meses no Google. São possíveis pacientes que talvez não estejam te encontrando. E hoje isso vai além do Google: muita gente já pergunta direto pra ferramentas de IA, tipo ChatGPT, qual profissional procurar, e quem não está bem posicionado simplesmente não é citado nessas respostas.{{#concorrente}} Hoje quem aparece na frente {{#categoria}}pra "{{categoria}}{{#cidade}} em {{cidade}}{{/cidade}}"{{/categoria}}{{^categoria}}nessa busca{{/categoria}} é {{concorrente}}{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}}.{{/concorrente}} Preparei um diagnóstico gratuito mostrando esses números reais e o potencial de vocês aparecerem mais nas buscas e nas IAs, e atenderem mais gente. Posso te enviar? Não tem nenhum custo.`
+      `Olá, é da{{#nome}} {{nome}}{{/nome}}{{^nome}} sua empresa{{/nome}}? {{#tem_perfil}}Vi o perfil de vocês no Google{{#avaliacoes}}, com {{avaliacoes}} avaliações{{/avaliacoes}}, muito bacana o retorno que vocês já têm por lá. {{/tem_perfil}}Fiz uma pesquisa e vi que tem{{#buscas}} {{buscas}}{{/buscas}} pessoas procurando por {{#categoria}}{{categoria}}{{/categoria}}{{^categoria}}esse serviço{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} todos os meses no Google. São possíveis pacientes que talvez não estejam te encontrando. E hoje isso vai além do Google: muita gente já pergunta direto pra ferramentas de IA, tipo ChatGPT, qual profissional procurar, e quem não está bem posicionado simplesmente não é citado nessas respostas.{{#concorrente}} Hoje quem aparece na frente {{#categoria}}pra "{{categoria}}{{#cidade}} em {{cidade}}{{/cidade}}"{{/categoria}}{{^categoria}}nessa busca{{/categoria}} é {{concorrente}}{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}}.{{/concorrente}} Preparei uma análise gratuita mostrando esses números reais e o potencial de vocês aparecerem mais nas buscas e nas IAs, e atenderem mais gente. Posso te enviar? Não tem nenhum custo.`
     ),
   },
   {
@@ -261,9 +264,9 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
   // ---- Contato 1 em diante: cadência numerada, compartilhada pelos dois canais ----
   {
     id: "diagnostico_ia",
-    label: "1º contato: Diagnóstico (Google e IA)",
+    label: "1º contato: Análise (Google e IA)",
     description:
-      "1º contato oficial da cadência, pros dois canais: entrega o diagnóstico de verdade já de cara, com base em buscas reais no Google e nas respostas de ferramentas de IA (ChatGPT), em vez de só oferecer e esperar resposta. Enviado como sequência de mensagens curtas (não texto único) pra soar natural. Tom se ajusta sozinho: parabeniza quem já tem perfil no Google, e só sinaliza pontos de atenção de forma genérica (sem revelar detalhes) pra despertar curiosidade sobre a reunião. Rode a busca de concorrentes antes de enviar pra preencher os dados automaticamente.",
+      "1º contato oficial da cadência, pros dois canais: entrega a análise de verdade já de cara, com base em buscas reais no Google e nas respostas de ferramentas de IA (ChatGPT), em vez de só oferecer e esperar resposta. Enviado como sequência de mensagens curtas (não texto único) pra soar natural. Tom se ajusta sozinho: parabeniza quem já tem perfil no Google, e só sinaliza pontos de atenção de forma genérica (sem revelar detalhes) pra despertar curiosidade sobre o diagnóstico completo, que só acontece ao vivo, na reunião. Rode a busca de concorrentes antes de enviar pra preencher os dados automaticamente.",
     appliesTo: ["novo_lead"],
     channel: "ambos",
     text: DIAGNOSTICO_IA_BLOCKS.join("\n\n"),
@@ -271,13 +274,13 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
   },
   {
     id: "cobranca_diagnostico",
-    label: "2º contato: Cobrança do diagnóstico",
+    label: "2º contato: Cobrança da análise",
     description:
-      "2º contato: pergunta se viu a análise (Google e IA) enviada no 1º contato, sem soar insistente, e oferece reenviar. Tom neutro de propósito (não assume 'está perdendo pacientes'), porque o diagnóstico do 1º contato pode ter sido positivo (já tem perfil, só falta otimizar) ou de alerta, dependendo do lead.",
+      "2º contato: pergunta se viu a análise (Google e IA) enviada no 1º contato, sem soar insistente, e oferece reenviar. Tom neutro de propósito (não assume 'está perdendo pacientes'), porque a análise do 1º contato pode ter sido positiva (já tem perfil, só falta otimizar) ou de alerta, dependendo do lead. Não afirma que a análise já trouxe o passo a passo de como melhorar, isso é reservado pro diagnóstico completo, mostrado ao vivo na reunião.",
     appliesTo: ["primeiro_contato"],
     channel: "ambos",
     text: withSignature(
-      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}conseguiu dar uma olhada no diagnóstico que te mandei sobre a presença de vocês no Google e nas buscas por IA? Ele mostra onde{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} vocês{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} está hoje nessas buscas e o que dá pra fazer pra ocupar as primeiras posições, sem precisar de anúncio pago. Posso separar uns 15 minutos essa semana pra te mostrar os números com calma? Se preferir, me chama que já te reenvio o diagnóstico.`
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}conseguiu dar uma olhada na análise que te mandei sobre a presença de vocês no Google e nas buscas por IA? Ela mostra como{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} vocês{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} aparece hoje nessas buscas. Posso separar uns 15 minutos essa semana pra te mostrar ao vivo o diagnóstico completo e o que dá pra fazer pra ocupar as primeiras posições, sem precisar de anúncio pago? Se preferir, me chama que já te reenvio a análise.`
     ),
   },
   {
@@ -339,7 +342,7 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
     id: "oitavo_contato",
     label: "8º contato: Fechamento educado",
     description:
-      "8º e último contato da sequência: recapitula tudo que já foi mostrado (diagnóstico, concorrência, referência, ticket médio, agenda, prova social) e dá uma saída elegante, deixando a porta aberta caso o lead volte a ser prioridade.",
+      "8º e último contato da sequência: recapitula tudo que já foi mostrado (análise, concorrência, referência, ticket médio, agenda, prova social) e dá uma saída elegante, deixando a porta aberta caso o lead volte a ser prioridade.",
     appliesTo: ["setimo_contato"],
     channel: "ambos",
     text: withSignature(
