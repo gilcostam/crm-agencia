@@ -209,6 +209,25 @@ const BREAK_OFF_BLOCKS: string[] = [
 ];
 
 /**
+ * Abordagem alternativa (aquecimento antes da análise oficial, ver
+ * `primeira_abordagem`). Dividida em blocos, no mesmo espírito de
+ * DIAGNOSTICO_IA_BLOCKS, em vez de um texto único: além de soar mais natural,
+ * evita jogar tudo (volume de busca, ameaça de IA e concorrente nomeado) numa
+ * única parede de texto pro primeiro contato frio com o lead. Ajustado com
+ * SPIN Selling: a implicação do problema ("pacientes que talvez não estejam
+ * te encontrando") vira uma pergunta pro lead responder, em vez de só ser
+ * afirmada, e o fechamento continua de baixíssimo compromisso (oferecer
+ * mandar a análise, não pedir reunião), apropriado pra quem ainda não teve
+ * nenhum contato antes.
+ */
+const PRIMEIRA_ABORDAGEM_BLOCKS: string[] = [
+  `Olá, é da{{#nome}} {{nome}}{{/nome}}{{^nome}} sua empresa{{/nome}}? {{#tem_perfil}}Vi o perfil de vocês no Google{{#avaliacoes}}, com {{avaliacoes}} avaliações{{/avaliacoes}}, muito bacana o retorno que vocês já têm por lá.{{/tem_perfil}}{{^tem_perfil}}Encontrei vocês numa pesquisa rápida sobre{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} esse tipo de negócio{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}.{{/tem_perfil}}`,
+  `Vi também que tem{{#buscas}} {{buscas}}{{/buscas}} pessoas procurando por {{#categoria}}{{categoria}}{{/categoria}}{{^categoria}}esse serviço{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} todos os meses no Google, e hoje isso vai além do Google: muita gente já pergunta direto pra ferramentas de IA, tipo ChatGPT, qual profissional procurar. Você acha que parte desse pessoal pode estar indo pra outro lugar sem nem saber que vocês existem?`,
+  `{{#concorrente}}Hoje, por exemplo, quem aparece na frente {{#categoria}}pra "{{categoria}}{{#cidade}} em {{cidade}}{{/cidade}}"{{/categoria}}{{^categoria}}nessa busca{{/categoria}} é {{concorrente}}{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}}. Quem não aparece bem também não é citado nas respostas que as IAs dão pra quem pergunta isso.{{/concorrente}}{{^concorrente}}Quem não está bem posicionado simplesmente não é citado nessas respostas de IA.{{/concorrente}}`,
+  `Preparei uma análise gratuita mostrando esses números reais e o potencial de vocês aparecerem mais nessas buscas e atenderem mais gente. Posso te enviar? Não tem nenhum custo.${SIGNATURE}`,
+];
+
+/**
  * A cadência completa tem 8 contatos, sempre nessa ordem lógica (ver
  * `appliesTo`/`defaultTemplateIdForStatus`: o texto mostrado por padrão no
  * composer, quando o lead está no status X, é a MENSAGEM SEGUINTE a mandar,
@@ -247,12 +266,11 @@ export const WHATSAPP_TEMPLATES: WhatsappTemplate[] = [
     id: "primeira_abordagem",
     label: "Abordagem alternativa (opcional, antes da análise)",
     description:
-      "Não faz mais parte da cadência numerada: o 1º contato oficial é a análise, logo abaixo. Use este modelo só se preferir um aquecimento mais suave antes de mandar a análise: confirma que chegou na empresa certa, cita fatores reais do perfil do lead (se a busca de concorrentes já rodou) e só oferece a análise, sem entregar ainda.",
+      "Não faz mais parte da cadência numerada: o 1º contato oficial é a análise, logo abaixo. Use este modelo só se preferir um aquecimento mais suave antes de mandar a análise: confirma que chegou na empresa certa, cita fatores reais do perfil do lead (se a busca de concorrentes já rodou) e só oferece a análise, sem entregar ainda. Ajustado com SPIN Selling: em vez de só declarar a implicação do problema (paciente pesquisando e não te encontrando), pergunta isso ao lead, e é enviado em blocos curtos (como o 1º contato oficial) em vez de um texto único. O fechamento continua de baixo compromisso (só oferece mandar a análise, não pede reunião ainda).",
     appliesTo: [],
     channel: "ativo",
-    text: withSignature(
-      `Olá, é da{{#nome}} {{nome}}{{/nome}}{{^nome}} sua empresa{{/nome}}? {{#tem_perfil}}Vi o perfil de vocês no Google{{#avaliacoes}}, com {{avaliacoes}} avaliações{{/avaliacoes}}, muito bacana o retorno que vocês já têm por lá. {{/tem_perfil}}Fiz uma pesquisa e vi que tem{{#buscas}} {{buscas}}{{/buscas}} pessoas procurando por {{#categoria}}{{categoria}}{{/categoria}}{{^categoria}}esse serviço{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} todos os meses no Google. São possíveis pacientes que talvez não estejam te encontrando. E hoje isso vai além do Google: muita gente já pergunta direto pra ferramentas de IA, tipo ChatGPT, qual profissional procurar, e quem não está bem posicionado simplesmente não é citado nessas respostas.{{#concorrente}} Hoje quem aparece na frente {{#categoria}}pra "{{categoria}}{{#cidade}} em {{cidade}}{{/cidade}}"{{/categoria}}{{^categoria}}nessa busca{{/categoria}} é {{concorrente}}{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}}.{{/concorrente}} Preparei uma análise gratuita mostrando esses números reais e o potencial de vocês aparecerem mais nas buscas e nas IAs, e atenderem mais gente. Posso te enviar? Não tem nenhum custo.`
-    ),
+    text: PRIMEIRA_ABORDAGEM_BLOCKS.join("\n\n"),
+    blocks: PRIMEIRA_ABORDAGEM_BLOCKS,
   },
   {
     id: "boas_vindas_pago",
