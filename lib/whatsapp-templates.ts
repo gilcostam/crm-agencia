@@ -233,6 +233,13 @@ const BREAK_OFF_BLOCKS: string[] = [
  * Esse rótulo com o número do contato aparece também no card do Kanban (ver
  * `nextMessageLabelForLead` em dashboard-client.tsx), pra equipe nunca ter
  * dúvida de qual mensagem mandar em seguida.
+ *
+ * Ajuste inspirado em SPIN Selling (Neil Rackham): os contatos 2 a 7 evitam
+ * só declarar benefício e pedir reunião em toda mensagem (fechamento repetido
+ * demais tende a gerar resistência em venda complexa). Em vez disso, boa
+ * parte deles faz uma pergunta de Problema/Implicação/Necessidade-benefício
+ * pra que o próprio lead verbalize a dor ou o ganho, com o pedido de reunião
+ * aparecendo intercalado (não em toda mensagem seguida).
  */
 export const WHATSAPP_TEMPLATES: WhatsappTemplate[] = [
   // ---- Fora da cadência numerada: alternativa opcional / aviso automático ----
@@ -276,66 +283,66 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
     id: "cobranca_diagnostico",
     label: "2º contato: Cobrança da análise",
     description:
-      "2º contato: pergunta se viu a análise (Google e IA) enviada no 1º contato, sem soar insistente, e oferece reenviar. Tom neutro de propósito (não assume 'está perdendo pacientes'), porque a análise do 1º contato pode ter sido positiva (já tem perfil, só falta otimizar) ou de alerta, dependendo do lead. Não afirma que a análise já trouxe o passo a passo de como melhorar, isso é reservado pro diagnóstico completo, mostrado ao vivo na reunião.",
+      "2º contato: pergunta se viu a análise (Google e IA) enviada no 1º contato, sem soar insistente. Em vez de já pedir reunião de novo (o 1º contato já fechou com um convite), faz uma pergunta de Problema (SPIN) pra puxar o lead a comentar o que sente na prática, agenda ociosa, poucos pacientes novos etc. Tom neutro de propósito (não assume 'está perdendo pacientes'), porque a análise do 1º contato pode ter sido positiva (já tem perfil, só falta otimizar) ou de alerta, dependendo do lead. Não afirma que a análise já trouxe o passo a passo de como melhorar, isso é reservado pro diagnóstico completo, mostrado ao vivo na reunião.",
     appliesTo: ["primeiro_contato"],
     channel: "ambos",
     text: withSignature(
-      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}conseguiu dar uma olhada na análise que te mandei sobre a presença de vocês no Google e nas buscas por IA? Ela mostra como{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} vocês{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} aparece hoje nessas buscas. Posso separar uns 15 minutos essa semana pra te mostrar ao vivo o diagnóstico completo e o que dá pra fazer pra ocupar as primeiras posições, sem precisar de anúncio pago? Se preferir, me chama que já te reenvio a análise.`
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}conseguiu dar uma olhada na análise que te mandei sobre a presença de vocês no Google e nas buscas por IA? Ela mostra como{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} vocês{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} aparece hoje nessas buscas. Fico curioso: isso bate com o que você sente no dia a dia, tipo vem menos paciente novo do que gostaria, ou sobra mais horário vago na agenda do que deveria? Se preferir, me chama que já te reenvio a análise.`
     ),
   },
   {
     id: "autoridade_referencia",
     label: "3º contato: Referência na especialidade",
     description:
-      "3º contato: muda o ângulo pra autoridade, mostra que quem investe nisso vira referência na especialidade, não só mais um nome na lista.",
+      "3º contato: muda o ângulo pra autoridade e, seguindo SPIN Selling, troca a afirmação de benefício por uma pergunta de valor (o que muda pra vocês virarem a referência), pra o próprio lead verbalizar o que ganharia, em vez de só ouvir a gente afirmar isso.",
     appliesTo: ["segundo_contato"],
     channel: "ambos",
     text: withSignature(
-      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}voltando a insistir, mas com um motivo 🙂 Tenho reparado que {{#categoria}}profissionais de {{categoria}}{{/categoria}}{{^categoria}}profissionais{{/categoria}} que aparecem bem no Google e nas respostas de IA acabam virando a referência{{#cidade}} em {{cidade}}{{/cidade}}, o nome que todo mundo lembra e indica, não só mais um da lista. É exatamente esse caminho que a análise que te mandei aponta: onde vocês estão hoje e o que falta pra chegar lá. Ainda faz sentido a gente conversar sobre isso?`
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}voltando a insistir, mas com um motivo 🙂 Reparei um detalhe na análise que te mandei: hoje, quando alguém pesquisa por{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} esse serviço{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} no Google ou pergunta pra uma IA, o nome que aparece primeiro nem sempre é o de quem tem mais preparo, é o de quem está mais bem posicionado online. Na prática, o que muda pra {{#categoria}}{{categoria}}{{/categoria}}{{^categoria}}vocês{{/categoria}} deixar de ser só mais um nome na lista e virar o profissional que todo mundo lembra e indica{{#cidade}} em {{cidade}}{{/cidade}}?`
     ),
   },
   {
     id: "ticket_medio_convenio",
     label: "4º contato: Ticket médio e convênios",
     description:
-      "4º contato: cita o resultado de negócio (ticket médio maior, menos dependência de convênio/plano de saúde) que outros clientes já colhem ao virar referência.",
+      "4º contato: em vez de só afirmar que o ticket médio sobe, pergunta o que isso mudaria no caixa do lead (pergunta de necessidade/benefício, SPIN), e só depois conecta com o resultado que outros clientes já têm ao virar referência.",
     appliesTo: ["terceiro_contato"],
     channel: "ambos",
     text: withSignature(
-      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}um dado que talvez ajude a decidir: boa parte dos nossos clientes, à medida que se tornam referência na região, conseguem aumentar o ticket médio e depender menos de convênio/plano de saúde, porque passam a atrair paciente particular direto pela reputação online, não só por indicação. Isso conecta direto com o que te mostrei na análise{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}: dá pra reproduzir esse caminho com vocês também. Posso separar 15 minutos pra te mostrar como, na prática?`
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}uma pergunta que talvez ajude a pensar nisso: se vocês passassem a atrair mais paciente particular direto pela reputação online, sem depender tanto de convênio ou plano de saúde, o que isso mudaria no ticket médio e no caixa do mês? Isso conecta direto com o que te mostrei na análise{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}: boa parte dos nossos clientes já vive esse caminho, à medida que vira referência na região. Faz sentido eu te mostrar como, na prática?`
     ),
   },
   {
     id: "alerta_concorrencia",
     label: "5º contato: Alerta de concorrência",
     description:
-      "5º contato: usa o gancho de perda, concorrente menos preparado ocupando o espaço de vocês no Google/IA. Preenche automaticamente se a busca de concorrentes já rodou.",
+      "5º contato: usa o gancho de perda, concorrente menos preparado ocupando o espaço de vocês no Google/IA. Em vez de afirmar a consequência, pergunta o que o lead acha que acontece se essa diferença continuar (pergunta de Implicação, SPIN), pra ele mesmo chegar à urgência, sem pedir reunião de novo logo em seguida (o 4º contato já pediu). Preenche automaticamente se a busca de concorrentes já rodou.",
     appliesTo: ["quarto_contato"],
     channel: "ambos",
     text: withSignature(
-      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}vou direto ao ponto: {{#concorrente}}hoje é {{concorrente}}{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}} quem aparece{{/concorrente}}{{^concorrente}}tem concorrente com bem menos experiência aparecendo{{/concorrente}} na frente {{#categoria}}quando alguém procura {{categoria}}{{/categoria}}{{^categoria}}nessa busca{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}, tanto no Google quanto nas respostas de ferramentas de IA. Isso já apareceu na análise que te mandei. Na prática, é paciente escolhendo um profissional com menos preparo só porque ele aparece primeiro. Ainda dá tempo de reverter, mas quanto mais tempo passa, mais essa posição se consolida. Vale 10 minutos ainda essa semana?`
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}vou direto ao ponto: {{#concorrente}}hoje é {{concorrente}}{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}} quem aparece{{/concorrente}}{{^concorrente}}tem concorrente com bem menos experiência aparecendo{{/concorrente}} na frente {{#categoria}}quando alguém procura {{categoria}}{{/categoria}}{{^categoria}}nessa busca{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}, tanto no Google quanto nas respostas de ferramentas de IA. Isso já apareceu na análise que te mandei. Na prática, é paciente escolhendo um profissional com menos preparo só porque ele aparece primeiro. O que você acha que acontece com essa diferença se ela continuar assim nos próximos meses, ela tende a diminuir sozinha ou só aumentar?`
     ),
   },
   {
     id: "agenda_cheia",
     label: "6º contato: Agenda cheia",
     description:
-      "6º contato: fecha com o resultado final que a agência entrega (agenda mais cheia, mais faturamento, menos ociosidade), sem soar como se fosse a última tentativa, ainda tem o 7º e o 8º.",
+      "6º contato: pergunta quanto vale pra o lead ter a agenda mais cheia e menos ociosidade (pergunta de necessidade/benefício, SPIN) antes de reforçar que é esse o resultado que os clientes que aplicam o diagnóstico costumam ter, sem soar como se fosse a última tentativa, ainda tem o 7º e o 8º.",
     appliesTo: ["quinto_contato"],
     channel: "ambos",
     text: withSignature(
-      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}sei que já mandei algumas mensagens por aqui, prometo que estou quase parando de insistir 😅 Só queria reforçar o resultado final de tudo isso: o que os clientes que aplicam esse diagnóstico têm em comum é agenda mais cheia, mais faturamento e menos tempo ocioso entre um atendimento e outro. Ainda posso te mostrar como chegar nisso, sem custo algum{{#categoria}}, pra {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}. Faz sentido a gente conversar essa semana?`
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}sei que já mandei algumas mensagens por aqui, prometo que estou quase parando de insistir 😅 Deixa eu te perguntar direto: hoje, quanto valeria pra você ter a agenda mais cheia, com menos horário ocioso entre um atendimento e outro, e mais faturamento no fim do mês? É esse o resultado que os clientes que aplicam esse diagnóstico costumam ter{{#categoria}}, entre profissionais de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}. Faz sentido a gente conversar essa semana pra eu te mostrar como chegar nisso, sem custo algum?`
     ),
   },
   {
     id: "prova_social",
     label: "7º contato: Prova social",
     description:
-      "7º contato: fortalece a credibilidade citando resultado real de outro cliente que aplicou o mesmo diagnóstico, como último reforço antes do fechamento.",
+      "7º contato: fortalece a credibilidade citando resultado real de outro cliente que aplicou o mesmo diagnóstico, e pergunta se um resultado parecido faria diferença pro lead, sem pedir reunião de novo (evita empilhar fechamento logo depois do 6º contato).",
     appliesTo: ["sexto_contato"],
     channel: "ambos",
     text: withSignature(
-      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}só um exemplo rápido pra ilustrar: outros clientes nossos{{#categoria}}, também de {{categoria}}{{/categoria}}, aplicaram exatamente esse diagnóstico e em poucos meses já apareciam entre os primeiros resultados do Google{{#cidade}} em {{cidade}}{{/cidade}} e passaram a ser citados nas respostas de IA, o que se traduz direto em mais paciente novo chegando sem precisar de indicação. É esse mesmo caminho que mapeamos pra vocês na análise que te mandei. Topa que eu te mostre como replicar isso aí?`
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}só um exemplo rápido pra ilustrar: outros clientes nossos{{#categoria}}, também de {{categoria}}{{/categoria}}, aplicaram exatamente esse diagnóstico e em poucos meses já apareciam entre os primeiros resultados do Google{{#cidade}} em {{cidade}}{{/cidade}} e passaram a ser citados nas respostas de IA, o que se traduz direto em mais paciente novo chegando sem precisar de indicação. É esse mesmo caminho que mapeamos pra vocês na análise que te mandei. Um resultado parecido faria diferença real aí pra vocês?`
     ),
   },
   {
