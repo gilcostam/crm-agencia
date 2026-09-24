@@ -327,22 +327,22 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
     id: "agenda_cheia",
     label: "6º contato: Agenda cheia",
     description:
-      "6º contato: pergunta quanto vale pra o lead ter a agenda mais cheia e menos ociosidade (pergunta de necessidade/benefício, SPIN) antes de reforçar que é esse o resultado que os clientes que aplicam o diagnóstico costumam ter, sem soar como se fosse a última tentativa, ainda tem o 7º e o 8º.",
+      "6º contato: pergunta quanto vale pra o lead ter a agenda mais cheia e menos ociosidade (pergunta de necessidade/benefício, SPIN) antes de reforçar que é esse o resultado que os clientes que aplicam o diagnóstico costumam ter. Cita só a especialidade, nunca a cidade do lead junto com 'clientes que aplicam o diagnóstico': combinar nicho + cidade nessa frase soaria como se já tivéssemos outro cliente do mesmo ramo, no mesmo mercado do lead, o que gera desconfiança/concorrência em vez de prova social (mesmo cuidado do 7º contato e do break_off, que também nunca cita concorrente específico).",
     appliesTo: ["quinto_contato"],
     channel: "ambos",
     text: withSignature(
-      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}sei que já mandei algumas mensagens por aqui, prometo que estou quase parando de insistir 😅 Deixa eu te perguntar direto: hoje, quanto valeria pra você ter a agenda mais cheia, com menos horário ocioso entre um atendimento e outro, e mais faturamento no fim do mês? É esse o resultado que os clientes que aplicam esse diagnóstico costumam ter{{#categoria}}, entre profissionais de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}. Faz sentido a gente conversar essa semana pra eu te mostrar como chegar nisso, sem custo algum?`
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}sei que já mandei algumas mensagens por aqui, prometo que estou quase parando de insistir 😅 Deixa eu te perguntar direto: hoje, quanto valeria pra você ter a agenda mais cheia, com menos horário ocioso entre um atendimento e outro, e mais faturamento no fim do mês? É esse o resultado que os clientes que aplicam esse diagnóstico costumam ter{{#categoria}}, entre profissionais de {{categoria}}{{/categoria}}. Faz sentido a gente conversar essa semana pra eu te mostrar como chegar nisso, sem custo algum?`
     ),
   },
   {
     id: "prova_social",
     label: "7º contato: Prova social",
     description:
-      "7º contato: fortalece a credibilidade citando resultado real de outro cliente que aplicou o mesmo diagnóstico, e pergunta se um resultado parecido faria diferença pro lead, sem pedir reunião de novo (evita empilhar fechamento logo depois do 6º contato).",
+      "7º contato: fortalece a credibilidade citando resultado real de outro cliente que aplicou o mesmo diagnóstico, e pergunta se um resultado parecido faria diferença pro lead, sem pedir reunião de novo (evita empilhar fechamento logo depois do 6º contato). Cita só a especialidade do outro cliente, nunca a cidade dele: combinar nicho + cidade do próprio lead nessa frase soaria como se já tivéssemos um cliente concorrente dele, no mesmo mercado, o que gera resistência/desconfiança em vez de prova social.",
     appliesTo: ["sexto_contato"],
     channel: "ambos",
     text: withSignature(
-      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}só um exemplo rápido pra ilustrar: outros clientes nossos{{#categoria}}, também de {{categoria}}{{/categoria}}, aplicaram exatamente esse diagnóstico e em poucos meses já apareciam entre os primeiros resultados do Google{{#cidade}} em {{cidade}}{{/cidade}} e passaram a ser citados nas respostas de IA, o que se traduz direto em mais paciente novo chegando sem precisar de indicação. É esse mesmo caminho que mapeamos pra vocês na análise que te mandei. Um resultado parecido faria diferença real aí pra vocês?`
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}só um exemplo rápido pra ilustrar: outros clientes nossos{{#categoria}}, também de {{categoria}}{{/categoria}}, aplicaram exatamente esse diagnóstico e em poucos meses já apareciam entre os primeiros resultados do Google e passaram a ser citados nas respostas de IA, o que se traduz direto em mais paciente novo chegando sem precisar de indicação. É esse mesmo caminho que mapeamos pra vocês na análise que te mandei. Um resultado parecido faria diferença real aí pra vocês?`
     ),
   },
   {
