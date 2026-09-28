@@ -67,6 +67,12 @@ export interface WhatsappTemplateVars {
   /** Mesma lógica de `tem_perfil`, mas pra presença de site (ver
    * hasWebsite em lib/serper.ts). */
   tem_site?: string | null;
+  /** Observação livre sobre o perfil de Instagram do lead (ex.: "feed bonito
+   * mas bio sem link", "poucas fotos recentes"), digitada à mão pelo vendedor
+   * depois de olhar o perfil (ver InstagramComposerModal.tsx). Só usada nos
+   * modelos do canal "instagram", pra personalizar o 1º contato com um
+   * comentário real sobre o próprio perfil, além dos dados de Google/IA. */
+  nota_perfil?: string | null;
 }
 
 type VarKey = keyof WhatsappTemplateVars;
@@ -84,6 +90,7 @@ const FIELD_LABELS: Record<VarKey, string> = {
   avaliacoes_concorrente: "nº de avaliações do concorrente",
   tem_perfil: "se o lead tem perfil no Google",
   tem_site: "se o lead tem site",
+  nota_perfil: "observação sobre o perfil do Instagram",
 };
 
 /** Vars usadas só como bandeira de presença/ausência (`tem_perfil`,
@@ -107,6 +114,7 @@ export const EDITABLE_EXTRA_KEYS: VarKey[] = [
   "avaliacoes",
   "concorrente",
   "avaliacoes_concorrente",
+  "nota_perfil",
 ];
 
 /** Testa se um template usa determinado placeholder (simples ou em seção),
@@ -120,13 +128,16 @@ export function templateUsesVar(templateText: string, key: VarKey): boolean {
  * os `trigger`s "auto_meta_ads"/"auto_trello" de lib/whatsapp-automation.ts. */
 const AUTO_WELCOME_SOURCES = new Set(["meta_ads", "trello"]);
 
-export type WhatsappChannel = "ativo" | "pago";
+export type WhatsappChannel = "ativo" | "pago" | "instagram";
 
 /** Deriva o canal de modelo a partir de `Lead.source`. Leads de prospecção
  * ativa (tng_prospeccao/prospeccao) e cadastros manuais usam o canal "ativo";
  * leads de Meta Ads/Trello usam "pago" (já receberam o aviso automático de
  * recebimento). Nos dois canais, o funil de contato numerado começa na
- * análise (1º contato). */
+ * análise (1º contato). Não cobre o canal "instagram": esse é escolhido à
+ * parte, direto pelo InstagramComposerModal (ver comentário lá), pra não
+ * misturar a lógica de canal do composer de WhatsApp/métricas com leads que
+ * também tenham telefone cadastrado além do Instagram. */
 export function whatsappChannelForSource(source: string | null | undefined): WhatsappChannel {
   return source && AUTO_WELCOME_SOURCES.has(source) ? "pago" : "ativo";
 }
@@ -226,6 +237,60 @@ const PRIMEIRA_ABORDAGEM_BLOCKS: string[] = [
   `{{#concorrente}}Hoje, por exemplo, quem aparece na frente {{#categoria}}pra "{{categoria}}{{#cidade}} em {{cidade}}{{/cidade}}"{{/categoria}}{{^categoria}}nessa busca{{/categoria}} é {{concorrente}}{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}}. Quem não aparece bem também não é citado nas respostas que as IAs dão pra quem pergunta isso.{{/concorrente}}{{^concorrente}}Quem não está bem posicionado simplesmente não é citado nessas respostas de IA.{{/concorrente}}`,
   `Preparei uma análise gratuita mostrando esses números reais e o potencial de vocês aparecerem mais nessas buscas e atenderem mais gente. Posso te enviar? Não tem nenhum custo.${SIGNATURE}`,
 ];
+
+/**
+ * Cadência específica pro canal "instagram" (leads com `source: "instagram"`,
+ * ver TNG_PROSPECTING_SOURCES/ACTIVE_PROSPECTING_SOURCES em lib/types.ts e
+ * InstagramComposerModal.tsx). Mesma lógica de 8 contatos da cadência
+ * principal (abaixo), mas reescrita do zero pra caber na etiqueta do
+ * Instagram Direct: mensagens curtas, de 1 a 3 frases, sem `blocks` (uma
+ * única "bolha") e sem SIGNATURE, já que o Direct já identifica quem está
+ * mandando a mensagem pela própria conta (diferente do WhatsApp, que parece
+ * um número anônimo até alguém se apresentar). O 1º contato cita o próprio
+ * perfil de Instagram do lead (`nota_perfil`, digitado à mão pelo vendedor
+ * depois de dar uma olhada no perfil) além dos dados de Google/IA, cumprindo
+ * o pedido de personalização "com análise do perfil". Mesmo cuidado do resto
+ * do arquivo: nunca combina categoria + "outros clientes nossos" com a
+ * cidade do próprio lead (ver prova social abaixo).
+ */
+const INSTAGRAM_ANALISE_TEXT =
+  `Oi{{#primeiro_nome}}, {{primeiro_nome}}{{/primeiro_nome}}! Aqui é da No Limits Marketing. Vi o Instagram de vocês{{#categoria}}, {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}{{#nota_perfil}} ({{nota_perfil}}){{/nota_perfil}} e resolvi checar como vocês aparecem no Google também. Fiz uma análise gratuita rapidinha, sem compromisso: posso te mandar aqui?`;
+
+const INSTAGRAM_COBRANCA_TEXT =
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}conseguiu ver a análise que te mandei? Só uma curiosidade: hoje o Instagram de vocês traz cliente novo, ou serve mais pra manter contato com quem já conhece o trabalho?`;
+
+const INSTAGRAM_AUTORIDADE_TEXT =
+  `Reparei um detalhe: o perfil de vocês é bom, mas isso só vira cliente novo se aparecer também quando alguém pesquisa no Google. O que mudaria pra vocês virarem a primeira opção que aparece por lá também{{#cidade}} em {{cidade}}{{/cidade}}?`;
+
+const INSTAGRAM_TICKET_MEDIO_TEXT =
+  `Uma pergunta rápida: se chegasse gente nova direto pelo Google, sem depender só do alcance do Instagram, isso mudaria seu faturamento do mês?`;
+
+const INSTAGRAM_ALERTA_CONCORRENCIA_TEXT =
+  `{{#concorrente}}Hoje é {{concorrente}} quem aparece na frente no Google, mesmo tendo um Instagram parecido com o de vocês.{{/concorrente}}{{^concorrente}}Tem concorrente com Instagram parecido aparecendo na frente de vocês no Google.{{/concorrente}} Essa diferença tende a aumentar ou diminuir com o tempo, na sua opinião?`;
+
+const INSTAGRAM_AGENDA_CHEIA_TEXT =
+  `Quanto valeria pra você ter a agenda mais cheia sem depender só do alcance do Instagram? Client{{#categoria}}es de {{categoria}}{{/categoria}} que ajustam isso no Google costumam sentir rápido. Faz sentido eu te mostrar como, sem custo?`;
+
+const INSTAGRAM_PROVA_SOCIAL_TEXT =
+  `Um exemplo rápido: outro cliente nosso{{#categoria}}, também de {{categoria}}{{/categoria}}, tinha um Instagram bom mas quase não aparecia no Google. Hoje está entre os primeiros resultados. Um resultado assim faria diferença pra vocês?`;
+
+const INSTAGRAM_FECHAMENTO_TEXT =
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}última mensagem por aqui, pra não encher seu Direct à toa 🙂 Resumindo: o Instagram de vocês está bem cuidado, mas o Google ainda tem espaço sobrando, e outros já estão ocupando esse espaço. Se quiser retomar, é só chamar.`;
+
+const INSTAGRAM_DIAGNOSTICO_ENVIADO_TEXT =
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}deu pra ver o diagnóstico que te mandei? Posso separar uns 15 minutos pra te explicar ao vivo e mostrar como aplicar?`;
+
+const INSTAGRAM_REUNIAO_MARCADA_TEXT =
+  `Combinado{{#reuniao}} pra {{reuniao}}{{/reuniao}}! Vou te mostrar ao vivo o diagnóstico completo{{#categoria}} de {{categoria}}{{/categoria}} e como crescer no Google além do Instagram. Até lá!`;
+
+const INSTAGRAM_LEMBRETE_REUNIAO_TEXT =
+  `Lembrete rápido: nossa conversa é{{#reuniao}} {{reuniao}}{{/reuniao}}! Vou te mostrar ao vivo as oportunidades no Google pra crescerem além do Instagram, e quem comparecer garante um bônus exclusivo. Confirma presença?`;
+
+const INSTAGRAM_NO_SHOW_TEXT =
+  `Não consegui falar com você no horário combinado, sem problema! Separei um resumo rápido do que encontramos: hoje{{#categoria}} outros negócios de {{categoria}}{{/categoria}}{{^categoria}} outros concorrentes{{/categoria}} vêm ganhando mais espaço no Google. Quer que eu te mande agora, ou prefere remarcar?`;
+
+const INSTAGRAM_BREAK_OFF_TEXT =
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}como não tivemos retorno, vou tirar seu contato da nossa lista ativa por aqui, pra não encher seu Direct à toa. Fica o alerta: enquanto isso, outros negócios{{#categoria}} de {{categoria}}{{/categoria}} seguem ganhando espaço no Google. Se virar prioridade, é só chamar.`;
 
 /**
  * A cadência completa tem 8 contatos, sempre nessa ordem lógica (ver
@@ -444,11 +509,130 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     channel: "ambos",
     text: "",
   },
+
+  // ---- Canal "instagram": cadência curta, própria do Instagram Direct ----
+  {
+    id: "instagram_analise",
+    label: "1º contato: Análise (perfil + Google/IA)",
+    description:
+      "1º contato oficial pro Instagram: cita o próprio perfil do lead (preencha 'observação sobre o perfil' depois de dar uma olhada nele) além da análise de Google/IA, e oferece mandar a análise, sem entregar nada ainda. Curto, de propósito, pra caber na etiqueta do Direct.",
+    appliesTo: ["novo_lead"],
+    channel: "instagram",
+    text: INSTAGRAM_ANALISE_TEXT,
+  },
+  {
+    id: "instagram_cobranca_analise",
+    label: "2º contato: Cobrança da análise",
+    description: "2º contato: pergunta se viu a análise, com uma pergunta de Problema (SPIN) sobre o próprio Instagram, sem soar insistente.",
+    appliesTo: ["primeiro_contato"],
+    channel: "instagram",
+    text: INSTAGRAM_COBRANCA_TEXT,
+  },
+  {
+    id: "instagram_autoridade",
+    label: "3º contato: Referência na especialidade",
+    description: "3º contato: pergunta de valor (SPIN) sobre virar referência também no Google, não só no Instagram.",
+    appliesTo: ["segundo_contato"],
+    channel: "instagram",
+    text: INSTAGRAM_AUTORIDADE_TEXT,
+  },
+  {
+    id: "instagram_ticket_medio",
+    label: "4º contato: Ticket médio",
+    description: "4º contato: pergunta de necessidade/benefício (SPIN) sobre faturamento vindo de fora do alcance do Instagram.",
+    appliesTo: ["terceiro_contato"],
+    channel: "instagram",
+    text: INSTAGRAM_TICKET_MEDIO_TEXT,
+  },
+  {
+    id: "instagram_alerta_concorrencia",
+    label: "5º contato: Alerta de concorrência",
+    description: "5º contato: concorrente com Instagram parecido, mas melhor posicionado no Google. Pergunta de Implicação (SPIN). Preenche automaticamente se a busca de concorrentes já rodou.",
+    appliesTo: ["quarto_contato"],
+    channel: "instagram",
+    text: INSTAGRAM_ALERTA_CONCORRENCIA_TEXT,
+  },
+  {
+    id: "instagram_agenda_cheia",
+    label: "6º contato: Agenda cheia",
+    description: "6º contato: pergunta de necessidade/benefício (SPIN) sobre agenda cheia. Cita só a especialidade, nunca a cidade do lead junto de 'clientes que ajustam isso', pelo mesmo motivo do 7º contato abaixo.",
+    appliesTo: ["quinto_contato"],
+    channel: "instagram",
+    text: INSTAGRAM_AGENDA_CHEIA_TEXT,
+  },
+  {
+    id: "instagram_prova_social",
+    label: "7º contato: Prova social",
+    description: "7º contato: resultado real de outro cliente. Cita só a especialidade do outro cliente, nunca a cidade dele, pra não soar como se já atendêssemos um concorrente direto do próprio lead.",
+    appliesTo: ["sexto_contato"],
+    channel: "instagram",
+    text: INSTAGRAM_PROVA_SOCIAL_TEXT,
+  },
+  {
+    id: "instagram_fechamento",
+    label: "8º contato: Fechamento educado",
+    description: "8º e último contato: recapitula rápido e deixa a porta aberta, sem encher o Direct do lead.",
+    appliesTo: ["setimo_contato"],
+    channel: "instagram",
+    text: INSTAGRAM_FECHAMENTO_TEXT,
+  },
+  {
+    id: "instagram_diagnostico_enviado",
+    label: "Cobrança do diagnóstico enviado (PDF)",
+    description: "Depois de enviar o relatório em PDF, puxa pra marcar os 15 minutos de explicação.",
+    appliesTo: ["diagnostico_enviado"],
+    channel: "instagram",
+    text: INSTAGRAM_DIAGNOSTICO_ENVIADO_TEXT,
+  },
+  {
+    id: "instagram_reuniao_marcada",
+    label: "Confirmação de reunião",
+    description: "Lembrete/confirmação curto pra quem já marcou a conversa do diagnóstico.",
+    appliesTo: ["reuniao_marcada"],
+    channel: "instagram",
+    text: INSTAGRAM_REUNIAO_MARCADA_TEXT,
+  },
+  {
+    id: "instagram_lembrete_reuniao",
+    label: "Lembrete de reunião (com bônus)",
+    description: "Lembrete pra mandar perto da data marcada, com o gancho do bônus exclusivo pra quem comparecer, em versão curta.",
+    appliesTo: ["reuniao_marcada"],
+    channel: "instagram",
+    text: INSTAGRAM_LEMBRETE_REUNIAO_TEXT,
+  },
+  {
+    id: "instagram_no_show",
+    label: "Resgate (não compareceu)",
+    description: "Para quem faltou à reunião: sem cobrança, gera senso de perda em relação aos concorrentes.",
+    appliesTo: ["no_show"],
+    channel: "instagram",
+    text: INSTAGRAM_NO_SHOW_TEXT,
+  },
+  {
+    id: "instagram_break_off",
+    label: "Break off (desqualificação educada)",
+    description: "Para quando o time decide tirar o lead da lista ativa por falta de retorno/prioridade, sem fechar a porta.",
+    appliesTo: ["desqualificado"],
+    channel: "instagram",
+    text: INSTAGRAM_BREAK_OFF_TEXT,
+  },
 ];
 
 /** Modelos visíveis pra um canal específico, na ordem em que devem aparecer
- * no seletor do composer (ativos/pagos primeiro, compartilhados por último). */
+ * no seletor do composer (ativos/pagos primeiro, compartilhados por último).
+ * O canal "instagram" é tratado à parte, sem herdar os modelos "ambos"
+ * (esses são os textos longos de WhatsApp): tem sua própria cadência curta,
+ * dedicada, e sempre inclui "personalizada" (mensagem em branco), único
+ * modelo "ambos" que continua fazendo sentido pra qualquer canal. */
 export function getTemplatesForChannel(channel: WhatsappChannel): WhatsappTemplate[] {
+  if (channel === "instagram") {
+    // "personalizada" está definida antes da seção "instagram" no array (é
+    // compartilhada com os outros canais), então isolar e reanexar ao final
+    // evita que "Mensagem em branco" apareça como 1ª opção no seletor.
+    const instagramTemplates = WHATSAPP_TEMPLATES.filter((t) => t.channel === "instagram");
+    const blank = WHATSAPP_TEMPLATES.find((t) => t.id === "personalizada");
+    return blank ? [...instagramTemplates, blank] : instagramTemplates;
+  }
   return WHATSAPP_TEMPLATES.filter((t) => t.channel === channel || t.channel === "ambos");
 }
 
@@ -556,5 +740,6 @@ export function buildTemplateVars(
     avaliacoes_concorrente: extras.avaliacoes_concorrente?.trim() || null,
     tem_perfil: extras.tem_perfil?.trim() || null,
     tem_site: extras.tem_site?.trim() || null,
+    nota_perfil: extras.nota_perfil?.trim() || null,
   };
 }

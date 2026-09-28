@@ -23,6 +23,15 @@ export type LeadStatus =
  * (ver app/dashboard/prospeccao/page.tsx e app/api/leads/route.ts). */
 export const ACTIVE_PROSPECTING_SOURCES = ["tng_prospeccao", "prospeccao", "instagram"] as const;
 
+/** Subconjunto de ACTIVE_PROSPECTING_SOURCES sem o Instagram: usado pra
+ * restringir o Kanban de "Prospecção Ativa" (app/dashboard/prospeccao/page.tsx)
+ * só aos leads de TNG/Maps, já que os leads de Instagram ganharam sua própria
+ * janela (ver app/dashboard/prospeccao/instagram/page.tsx), com abordagem e
+ * modelos de mensagem próprios (canal "instagram" em lib/whatsapp-templates.ts).
+ * Não altera ACTIVE_PROSPECTING_SOURCES em si: a exclusão dos três no Kanban
+ * principal (app/dashboard/page.tsx) continua igual. */
+export const TNG_PROSPECTING_SOURCES = ["tng_prospeccao", "prospeccao"] as const;
+
 export interface Lead {
   id: string;
   full_name: string | null;

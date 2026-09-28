@@ -22,11 +22,15 @@ import InstagramComposerModal from "./_components/InstagramComposerModal";
  * do Kanban (ver lib/whatsapp-templates.ts pra o desenho completo da
  * cadência de 8 contatos). Usa o mesmo cálculo do composer
  * (defaultTemplateIdForStatus), então o card sempre mostra exatamente o
- * modelo que abriria por padrão ao clicar em "Conversar no WhatsApp".
- * `null` pra status fora da cadência de contato (ex.: Contrato Assinado),
- * onde não faz sentido sugerir uma mensagem fixa. */
+ * modelo que abriria por padrão ao clicar em "Conversar no WhatsApp"/
+ * "Conversar no Instagram". Leads com Instagram cadastrado (`lead.instagram`)
+ * usam a cadência curta do canal "instagram" (mesmo sinal que decide se o
+ * botão "Conversar no Instagram" aparece, ver `lead.instagram &&` mais
+ * abaixo), independente da origem (`lead.source`) do lead. `null` pra status
+ * fora da cadência de contato (ex.: Contrato Assinado), onde não faz sentido
+ * sugerir uma mensagem fixa. */
 function nextMessageLabelForLead(lead: Lead): string | null {
-  const channel = whatsappChannelForSource(lead.source);
+  const channel = lead.instagram ? "instagram" : whatsappChannelForSource(lead.source);
   const templateId = defaultTemplateIdForStatus(lead.status, channel);
   if (templateId === "personalizada") return null;
   return getTemplate(templateId).label;

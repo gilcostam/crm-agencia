@@ -38,9 +38,14 @@ function formatMeetingForMessage(iso: string | null): string {
  * sempre "copiar o bloco" + "abrir o Direct" + colar manualmente — o envio
  * em si é sempre um clique humano, nunca automático.
  *
- * Sempre usa os modelos do canal "ativo" (prospecção ativa) — leads de
- * Instagram só existem nesse canal (ver ACTIVE_PROSPECTING_SOURCES em
- * lib/types.ts).
+ * Sempre usa os modelos do canal "instagram": uma cadência curta e própria,
+ * escrita pra caber na etiqueta do Direct (mensagens de 1 a 3 frases, sem os
+ * blocos/textos longos do canal "ativo" de WhatsApp), com uma pergunta a
+ * mais no 1º contato sobre o próprio perfil de Instagram do lead (ver
+ * `nota_perfil` em lib/whatsapp-templates.ts). O canal é fixo aqui, não
+ * derivado de `whatsappChannelForSource(lead.source)`, pra não misturar essa
+ * lógica com a do composer de WhatsApp/métricas (ver comentário na própria
+ * função em lib/whatsapp-templates.ts).
  */
 export default function InstagramComposerModal({
   lead,
@@ -52,11 +57,11 @@ export default function InstagramComposerModal({
   onLogged?: () => void;
 }) {
   const handle = lead.instagram;
-  const templatesForChannel = useMemo(() => getTemplatesForChannel("ativo"), []);
+  const templatesForChannel = useMemo(() => getTemplatesForChannel("instagram"), []);
 
   const [consultor, setConsultor] = useState("");
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
-  const [templateId, setTemplateId] = useState(() => defaultTemplateIdForStatus(lead.status, "ativo"));
+  const [templateId, setTemplateId] = useState(() => defaultTemplateIdForStatus(lead.status, "instagram"));
   const [blockTexts, setBlockTexts] = useState<string[]>([]);
   const [blockDirty, setBlockDirty] = useState<boolean[]>([]);
   // Mesmo "assistente" pausado do composer de WhatsApp, só que aqui o gatilho
@@ -364,7 +369,7 @@ export default function InstagramComposerModal({
                 type="text"
                 value={extraValues[key] ?? ""}
                 onChange={(e) => handleExtraChange(key, e.target.value)}
-                placeholder="ex.: 150"
+                placeholder={key === "nota_perfil" ? "ex.: feed bonito, mas bio sem link" : "ex.: 150"}
                 className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
               />
             </label>

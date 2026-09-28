@@ -7,6 +7,7 @@ import Link from "next/link";
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Leads", icon: LeadsIcon },
   { href: "/dashboard/prospeccao", label: "Prospecção Ativa", icon: ProspeccaoIcon },
+  { href: "/dashboard/prospeccao/instagram", label: "Prospecção Instagram", icon: InstagramIcon },
   { href: "/dashboard/clientes", label: "Clientes", icon: ClientsIcon },
   { href: "/dashboard/tarefas", label: "Tarefas", icon: TasksIcon },
   { href: "/dashboard/propostas", label: "Propostas", icon: ProposalsIcon },
@@ -28,6 +29,16 @@ function ProspeccaoIcon() {
     <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
       <circle cx="8.5" cy="8.5" r="5.5" />
       <path d="M16.5 16.5 13 13" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function InstagramIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      <rect x="2.5" y="2.5" width="15" height="15" rx="4" />
+      <circle cx="10" cy="10" r="3.6" />
+      <circle cx="14.3" cy="5.7" r="0.9" fill="currentColor" stroke="none" />
     </svg>
   );
 }
@@ -96,7 +107,14 @@ export default function Sidebar() {
 
       <nav className="flex flex-1 flex-row gap-1 overflow-x-auto px-2 py-2 md:flex-col md:overflow-visible md:py-3">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-          const active = href === "/dashboard" ? pathname === "/dashboard" : pathname?.startsWith(href);
+          // Marca ativo só o item de rota mais específica: sem isso,
+          // "/dashboard/prospeccao/instagram" também casaria (por prefixo) com
+          // "/dashboard/prospeccao", acendendo os dois itens ao mesmo tempo.
+          const matchingHrefs = NAV_ITEMS.map((item) => item.href).filter((candidate) =>
+            candidate === "/dashboard" ? pathname === "/dashboard" : pathname?.startsWith(candidate)
+          );
+          const mostSpecificHref = matchingHrefs.sort((a, b) => b.length - a.length)[0];
+          const active = href === mostSpecificHref;
           return (
             <Link
               key={href}
