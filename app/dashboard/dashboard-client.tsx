@@ -14,6 +14,7 @@ import {
   followupUrgency,
 } from "@/lib/types";
 import { sanitizePhone } from "@/lib/phone";
+import { sanitizeInternationalPhone } from "@/lib/international-phone";
 import { defaultTemplateIdForStatus, getTemplate, whatsappChannelForSource } from "@/lib/whatsapp-templates";
 import WhatsAppComposerModal from "./_components/WhatsAppComposerModal";
 import InstagramComposerModal from "./_components/InstagramComposerModal";
@@ -26,11 +27,20 @@ import InstagramComposerModal from "./_components/InstagramComposerModal";
  * "Conversar no Instagram". Leads com Instagram cadastrado (`lead.instagram`)
  * usam a cadência curta do canal "instagram" (mesmo sinal que decide se o
  * botão "Conversar no Instagram" aparece, ver `lead.instagram &&` mais
- * abaixo), independente da origem (`lead.source`) do lead. `null` pra status
- * fora da cadência de contato (ex.: Contrato Assinado), onde não faz sentido
- * sugerir uma mensagem fixa. */
+ * abaixo), independente da origem (`lead.source`) do lead. Exceção: leads de
+ * `source: "internacional"` (EUA/Canadá) checam isso ANTES de olhar pra
+ * `lead.instagram` (whatsappChannelForSource já resolve "internacional"
+ * direto), pra não sugerir por engano a cadência em português do Instagram
+ * pra um lead internacional que também tenha um handle cadastrado. `null`
+ * pra status fora da cadência de contato (ex.: Contrato Assinado), onde não
+ * faz sentido sugerir uma mensagem fixa. */
 function nextMessageLabelForLead(lead: Lead): string | null {
-  const channel = lead.instagram ? "instagram" : whatsappChannelForSource(lead.source);
+  const channel =
+    lead.source === "internacional"
+      ? whatsappChannelForSource(lead.source)
+      : lead.instagram
+        ? "instagram"
+        : whatsappChannelForSource(lead.source);
   const templateId = defaultTemplateIdForStatus(lead.status, channel);
   if (templateId === "personalizada") return null;
   return getTemplate(templateId).label;
@@ -113,14 +123,19 @@ function formatBytes(bytes: number | null | undefined): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function whatsappUrl(phone: string | null, leadName: string | null): string | null {
-  const digits = sanitizePhone(phone);
-  if (!digits) return null;
-  const firstName = leadName?.trim().split(" ")[0] || "";
-  const message = encodeURIComponent(
-    `Olá${firstName ? " " + firstName : ""}! Aqui é da equipe da No Limits, vi seu contato e gostaria de conversar sobre marketing digital para o seu negócio.`
-  );
-  return `https://wa.me/${digits}?text=${message}`;
+/** Só usado como gate (mostrar/esconder o botão "Conversar no WhatsApp"), o
+ * texto da mensagem em si já é decidido pelo composer (ver
+ * WhatsAppComposerModal.tsx), então esta função só precisa responder "esse
+ * telefone é válido pra abrir o WhatsApp?". Fica atenta à origem do lead:
+ * `sanitizePhone` só reconhece telefone brasileiro (12-13 dígitos, prefixo
+ * "55"), então um NANP válido de 11 dígitos (EUA/Canadá, ver
+ * lib/international-phone.ts) precisa passar por `sanitizeInternationalPhone`
+ * em vez disso, senão o botão simplesmente some pra qualquer lead
+ * internacional com telefone válido. */
+function leadHasWhatsappNumber(lead: { phone: string | null; source: string | null }): boolean {
+  const digits =
+    lead.source === "internacional" ? sanitizeInternationalPhone(lead.phone) : sanitizePhone(lead.phone);
+  return Boolean(digits);
 }
 
 function toGoogleCalendarStamp(d: Date): string {
@@ -247,6 +262,7 @@ interface LeadDetailModalProps {
   onSaveNextFollowup: (id: string, date: string | null) => Promise<void>;
   onOpenComposer: (id: string) => void;
   onOpenInstagramComposer: (id: string) => void;
+  onSendToProspecting?: (id: string) => void;
 }
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
@@ -269,6 +285,7 @@ function LeadDetailModal({
   onSaveNextFollowup,
   onOpenComposer,
   onOpenInstagramComposer,
+  onSendToProspecting,
 }: LeadDetailModalProps) {
   const [notes, setNotes] = useState(lead.notes ?? "");
   const [meetingValue, setMeetingValue] = useState(toDatetimeLocalValue(lead.meeting_datetime));
@@ -379,7 +396,7 @@ function LeadDetailModal({
     }
   }
 
-  const wa = whatsappUrl(lead.phone, lead.full_name);
+  const wa = leadHasWhatsappNumber(lead);
   const alreadySentWhatsapp = events.some((e) => e.type === "whatsapp_sent");
 
   return (
@@ -480,6 +497,19 @@ function LeadDetailModal({
                 ? "Reenviar sequência WhatsApp"
                 : "Disparar sequência WhatsApp"}
           </button>
+          {onSendToProspecting && (
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm("Enviar este lead para a Prospecção Ativa?")) {
+                  onSendToProspecting(lead.id);
+                }
+              }}
+              className="inline-flex items-center gap-1.5 rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 hover:bg-neutral-100"
+            >
+              Enviar para Prospecção Ativa
+            </button>
+          )}
         </div>
         {alreadySentWhatsapp && !whatsappResult && (
           <p className="mb-3 text-xs text-neutral-500">
@@ -1053,6 +1083,9 @@ export default function DashboardClient({
   enableTngImport = false,
   enableInstagramImport = false,
   enableInstagramSheetImport = false,
+  enableInternationalSheetImport = false,
+  enableSendToProspecting = false,
+  defaultLeadSource,
 }: {
   initialLeads: Lead[];
   /** Título exibido no cabeçalho da página (ex.: "Prospecção Ativa" na tela
@@ -1075,6 +1108,23 @@ export default function DashboardClient({
    * toolbar — alternativa ao enableInstagramImport pra quem já tem a lista
    * de perfis numa planilha, mesmo critério de tela. */
   enableInstagramSheetImport?: boolean;
+  /** Mostra o botão "Import spreadsheet" (upload de CSV) da tela de
+   * Prospecção EUA/Canadá — mesmo mecanismo do enableInstagramSheetImport,
+   * mas chamando /api/leads/import-international-sheet (ver
+   * lib/international-sheet-import.ts). */
+  enableInternationalSheetImport?: boolean;
+  /** Mostra o botão "Enviar para Prospecção Ativa" no modal de detalhe do
+   * lead — só faz sentido na tela de "Leads" (app/dashboard/page.tsx, tráfego
+   * pago/Trello), que é de onde um lead pode precisar migrar pra fora do
+   * fluxo de tráfego pago e entrar no funil de prospecção ativa (mesmo
+   * `source: "prospeccao"` usado pelo cadastro manual, ver
+   * app/api/leads/route.ts). */
+  enableSendToProspecting?: boolean;
+  /** `source` a marcar automaticamente em todo lead criado via "+ Novo lead"
+   * nesta tela (ver createLead abaixo). Sem isso, um cadastro manual feito
+   * dentro da tela de Prospecção EUA/Canadá cairia em "manual" e sumiria do
+   * filtro dessa tela (e dos modelos em inglês) assim que a página recarregar. */
+  defaultLeadSource?: string;
 }) {
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -1113,6 +1163,15 @@ export default function DashboardClient({
   const [importingInstagramSheet, setImportingInstagramSheet] = useState(false);
   const [instagramSheetImportError, setInstagramSheetImportError] = useState<string | null>(null);
   const [instagramSheetImportResult, setInstagramSheetImportResult] = useState<{
+    totalRows: number;
+    skippedInvalid: number;
+    mergedCount: number;
+    imported: number;
+  } | null>(null);
+  const internationalSheetFileInputRef = useRef<HTMLInputElement>(null);
+  const [importingInternationalSheet, setImportingInternationalSheet] = useState(false);
+  const [internationalSheetImportError, setInternationalSheetImportError] = useState<string | null>(null);
+  const [internationalSheetImportResult, setInternationalSheetImportResult] = useState<{
     totalRows: number;
     skippedInvalid: number;
     mergedCount: number;
@@ -1253,6 +1312,15 @@ export default function DashboardClient({
     return () => clearTimeout(timeout);
   }, [instagramSheetImportResult, instagramSheetImportError]);
 
+  useEffect(() => {
+    if (!internationalSheetImportResult && !internationalSheetImportError) return;
+    const timeout = setTimeout(() => {
+      setInternationalSheetImportResult(null);
+      setInternationalSheetImportError(null);
+    }, 15000);
+    return () => clearTimeout(timeout);
+  }, [internationalSheetImportResult, internationalSheetImportError]);
+
   async function handleInstagramImportSubmit(text: string) {
     setImportingInstagram(true);
     setInstagramImportError(null);
@@ -1336,6 +1404,34 @@ export default function DashboardClient({
     }
   }
 
+  async function handleInternationalSheetCsvChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportingInternationalSheet(true);
+    setInternationalSheetImportError(null);
+    setInternationalSheetImportResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/leads/import-international-sheet", { method: "POST", body: formData });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok || !data) {
+        setInternationalSheetImportError(data?.error || "Erro ao importar a planilha.");
+      } else {
+        setInternationalSheetImportResult(data);
+        await refresh();
+      }
+    } catch {
+      setInternationalSheetImportError("Erro de conexão ao importar a planilha.");
+    } finally {
+      setImportingInternationalSheet(false);
+      if (internationalSheetFileInputRef.current) internationalSheetFileInputRef.current.value = "";
+    }
+  }
+
   async function updateStatus(id: string, status: LeadStatus) {
     const previousLead = leads.find((l) => l.id === id);
     setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
@@ -1359,6 +1455,22 @@ export default function DashboardClient({
       setConversionNotice({ leadName: previousLead.full_name || "Lead" });
     }
 
+    refresh();
+  }
+
+  /** Move um lead de tráfego pago/Trello (tela de "Leads") pra prospecção
+   * ativa, mudando seu `source` pra "prospeccao" (ver whitelist em
+   * app/api/leads/[id]/route.ts). Remove o lead da lista local na hora —
+   * ele deixa de pertencer ao recorte desta tela — e fecha o modal, já que
+   * ele não existe mais aqui. */
+  async function sendToProspecting(id: string) {
+    setLeads((prev) => prev.filter((l) => l.id !== id));
+    setSelectedLeadId(null);
+    await fetch(`/api/leads/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: "prospeccao" }),
+    });
     refresh();
   }
 
@@ -1421,7 +1533,11 @@ export default function DashboardClient({
       const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        // `defaultLeadSource` marca "+ Novo lead" desta tela com o `source`
+        // certo (ex.: "internacional" na Prospecção EUA/Canadá), pra não cair
+        // em "manual" e sumir do filtro/templates dessa tela (ver whitelist
+        // de override em app/api/leads/route.ts).
+        body: JSON.stringify(defaultLeadSource ? { ...payload, source: defaultLeadSource } : payload),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -1791,6 +1907,48 @@ export default function DashboardClient({
           </div>
         )}
 
+        {enableInternationalSheetImport && (internationalSheetImportResult || internationalSheetImportError) && (
+          <div
+            className={`mb-5 flex items-center justify-between rounded-md border px-4 py-2.5 text-sm ${
+              internationalSheetImportError
+                ? "border-red-300 bg-red-50 text-red-800"
+                : "border-emerald-300 bg-emerald-50 text-emerald-800"
+            }`}
+          >
+            <span>
+              {internationalSheetImportError
+                ? `❌ ${internationalSheetImportError}`
+                : internationalSheetImportResult && (
+                    <>
+                      ✅ Planilha importada: <strong>{internationalSheetImportResult.imported}</strong> leads
+                      criados/atualizados de {internationalSheetImportResult.totalRows} linhas
+                      {internationalSheetImportResult.skippedInvalid > 0
+                        ? ` (${internationalSheetImportResult.skippedInvalid} inválidas, puladas)`
+                        : ""}
+                      {internationalSheetImportResult.mergedCount > 0
+                        ? ` (${internationalSheetImportResult.mergedCount} duplicados agrupados)`
+                        : ""}
+                      .
+                    </>
+                  )}
+            </span>
+            <button
+              onClick={() => {
+                setInternationalSheetImportResult(null);
+                setInternationalSheetImportError(null);
+              }}
+              className={`ml-3 shrink-0 ${
+                internationalSheetImportError
+                  ? "text-red-500 hover:text-red-900"
+                  : "text-emerald-500 hover:text-emerald-900"
+              }`}
+              aria-label="Fechar aviso"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         <div className="mb-5 flex flex-wrap items-center gap-3">
           <input
             type="search"
@@ -1909,6 +2067,25 @@ export default function DashboardClient({
               </button>
             </>
           )}
+          {enableInternationalSheetImport && (
+            <>
+              <input
+                ref={internationalSheetFileInputRef}
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={handleInternationalSheetCsvChange}
+              />
+              <button
+                onClick={() => internationalSheetFileInputRef.current?.click()}
+                disabled={importingInternationalSheet}
+                title="A planilha precisa ter pelo menos uma coluna de nome, telefone ou Instagram (ex.: 'name', 'phone' ou 'instagram'); categoria e cidade são opcionais."
+                className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {importingInternationalSheet ? "Importando..." : "Importar planilha"}
+              </button>
+            </>
+          )}
           <button
             onClick={() => setShowNewLeadModal(true)}
             className="rounded-md bg-neutral-900 px-3 py-2 text-sm font-medium text-white hover:bg-neutral-700"
@@ -1968,7 +2145,7 @@ export default function DashboardClient({
                   )}
 
                   {columnLeads.map((lead) => {
-                    const wa = whatsappUrl(lead.phone, lead.full_name);
+                    const wa = leadHasWhatsappNumber(lead);
                     const stale =
                       STALE_STATUSES.includes(lead.status) &&
                       daysSince(lead.updated_at) >= STALE_DAYS_THRESHOLD;
@@ -2170,6 +2347,7 @@ export default function DashboardClient({
           onSaveNextFollowup={saveNextFollowup}
           onOpenComposer={setComposerLeadId}
           onOpenInstagramComposer={setInstagramComposerLeadId}
+          onSendToProspecting={enableSendToProspecting ? sendToProspecting : undefined}
         />
       )}
 
@@ -2180,6 +2358,7 @@ export default function DashboardClient({
       {instagramComposerLead && (
         <InstagramComposerModal
           lead={instagramComposerLead}
+          channel={instagramComposerLead.source === "internacional" ? "internacional" : "instagram"}
           onClose={() => setInstagramComposerLeadId(null)}
         />
       )}

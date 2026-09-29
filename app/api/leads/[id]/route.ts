@@ -5,6 +5,15 @@ import { LeadStatus, STATUS_LABELS, STATUS_ORDER } from "@/lib/types";
 import { syncLeadStatusToTrello } from "@/lib/trello";
 import { buildStatusChangeUpdate, FOLLOWUP_INTERVAL_HOURS } from "@/lib/lead-status";
 
+/** Únicos valores de `source` que este PATCH aceita receber — hoje só o
+ * botão "Enviar para Prospecção Ativa" da tela de Leads (ver
+ * app/dashboard/dashboard-client.tsx), que move um lead de tráfego
+ * pago/Trello para o funil de prospecção ativa. Uma whitelist, não um
+ * passthrough livre de `source`, pelo mesmo motivo do POST em
+ * app/api/leads/route.ts: nenhum outro caminho pode forjar um `source`
+ * arbitrário por aqui (ex.: "meta_ads", que dispara boas-vindas automática). */
+const ALLOWED_SOURCE_UPDATES = new Set(["prospeccao"]);
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -23,6 +32,7 @@ export async function PATCH(
     next_followup,
     city,
     category,
+    source,
   } = body as {
     status?: string;
     notes?: string;
@@ -31,6 +41,7 @@ export async function PATCH(
     next_followup?: string | null;
     city?: string | null;
     category?: string | null;
+    source?: string;
   };
 
   const update: {
@@ -41,6 +52,7 @@ export async function PATCH(
     next_followup?: string | null;
     city?: string | null;
     category?: string | null;
+    source?: string;
     status_dates?: Partial<Record<LeadStatus, string>>;
   } = {};
 
@@ -49,6 +61,13 @@ export async function PATCH(
       return NextResponse.json({ error: "status inválido" }, { status: 400 });
     }
     update.status = status;
+  }
+
+  if (source !== undefined) {
+    if (!ALLOWED_SOURCE_UPDATES.has(source)) {
+      return NextResponse.json({ error: "source inválido" }, { status: 400 });
+    }
+    update.source = source;
   }
 
   if (notes !== undefined) {
@@ -94,7 +113,7 @@ export async function PATCH(
   const { data: before } = await supabase
     .from("leads")
     .select(
-      "status, notes, meeting_datetime, monthly_value, converted_to_client_id, external_key, status_dates"
+      "status, notes, meeting_datetime, monthly_value, converted_to_client_id, external_key, status_dates, source"
     )
     .eq("id", id)
     .single();
@@ -160,6 +179,14 @@ export async function PATCH(
       } catch (err) {
         console.error("Erro inesperado ao chamar sync CRM->Trello:", err);
       }
+    }
+
+    if (source !== undefined && before.source !== source) {
+      events.push({
+        lead_id: id,
+        type: "note",
+        message: "Lead movido para Prospecção Ativa",
+      });
     }
 
     if (notes !== undefined && (before.notes ?? "") !== notes) {

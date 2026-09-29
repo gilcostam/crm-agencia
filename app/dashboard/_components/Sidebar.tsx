@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Leads", icon: LeadsIcon },
   { href: "/dashboard/prospeccao", label: "Prospecção Ativa", icon: ProspeccaoIcon },
   { href: "/dashboard/prospeccao/instagram", label: "Prospecção Instagram", icon: InstagramIcon },
+  { href: "/dashboard/prospeccao/internacional", label: "Prospecção EUA/Canadá", icon: GlobeIcon },
   { href: "/dashboard/clientes", label: "Clientes", icon: ClientsIcon },
   { href: "/dashboard/tarefas", label: "Tarefas", icon: TasksIcon },
   { href: "/dashboard/propostas", label: "Propostas", icon: ProposalsIcon },
@@ -39,6 +40,15 @@ function InstagramIcon() {
       <rect x="2.5" y="2.5" width="15" height="15" rx="4" />
       <circle cx="10" cy="10" r="3.6" />
       <circle cx="14.3" cy="5.7" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function GlobeIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      <circle cx="10" cy="10" r="7.5" />
+      <path d="M2.5 10h15M10 2.5c2.2 2 3.4 4.8 3.4 7.5s-1.2 5.5-3.4 7.5c-2.2-2-3.4-4.8-3.4-7.5S7.8 4.5 10 2.5Z" />
     </svg>
   );
 }

@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const { full_name, phone, email, city, category, notes, status, monthly_value, instagram } =
+  const { full_name, phone, email, city, category, notes, status, monthly_value, instagram, source: sourceOverride } =
     body as {
       full_name?: string;
       phone?: string;
@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
       status?: string;
       monthly_value?: number | null;
       instagram?: string;
+      source?: string;
     };
 
   const name = (full_name ?? "").trim();
@@ -113,8 +114,24 @@ export async function POST(request: NextRequest) {
 
   // Cadastro manual sem telefone/e-mail mas com Instagram entra direto como
   // lead de prospecção ativa via Instagram (ver ACTIVE_PROSPECTING_SOURCES
-  // em lib/types.ts), pra aparecer no Kanban de Prospecção Ativa.
-  const source = !phoneTrimmed && !emailTrimmed && instagramHandle ? "instagram" : "manual";
+  // em lib/types.ts), pra aparecer no Kanban de Prospecção Ativa. Todo o
+  // resto do cadastro manual (com telefone e/ou e-mail) também nasce em
+  // prospecção ativa — `"prospeccao"`, o mesmo source do importador mais
+  // antigo (scripts/import_prospeccao_csv.py) e já incluído no Kanban de
+  // Prospecção Ativa (ver TNG_PROSPECTING_SOURCES em lib/types.ts) — porque
+  // a tela de "Leads" (app/dashboard/page.tsx) é exclusiva pra tráfego pago
+  // (Meta Ads) e Trello: um cadastro manual nunca deve nascer lá.
+  const computedSource = !phoneTrimmed && !emailTrimmed && instagramHandle ? "instagram" : "prospeccao";
+  // "+ Novo lead" digitado direto na tela de Prospecção EUA/Canadá precisa
+  // marcar o lead como `source: "internacional"` (senão ele some do filtro
+  // dessa tela e cai nos modelos em português) — ver `defaultLeadSource` em
+  // dashboard-client.tsx. Só aceita esse valor específico como override: uma
+  // whitelist, não um passthrough livre de `source`, pra nenhum outro
+  // caminho da API conseguir forjar um `source` arbitrário (ex.: "meta_ads",
+  // que dispara boas-vindas automática).
+  const ALLOWED_SOURCE_OVERRIDES = new Set(["internacional"]);
+  const source =
+    sourceOverride && ALLOWED_SOURCE_OVERRIDES.has(sourceOverride) ? sourceOverride : computedSource;
 
   const { data, error } = await supabase
     .from("leads")

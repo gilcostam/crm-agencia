@@ -128,17 +128,23 @@ export function templateUsesVar(templateText: string, key: VarKey): boolean {
  * os `trigger`s "auto_meta_ads"/"auto_trello" de lib/whatsapp-automation.ts. */
 const AUTO_WELCOME_SOURCES = new Set(["meta_ads", "trello"]);
 
-export type WhatsappChannel = "ativo" | "pago" | "instagram";
+export type WhatsappChannel = "ativo" | "pago" | "instagram" | "internacional";
 
 /** Deriva o canal de modelo a partir de `Lead.source`. Leads de prospecção
  * ativa (tng_prospeccao/prospeccao) e cadastros manuais usam o canal "ativo";
  * leads de Meta Ads/Trello usam "pago" (já receberam o aviso automático de
  * recebimento). Nos dois canais, o funil de contato numerado começa na
- * análise (1º contato). Não cobre o canal "instagram": esse é escolhido à
- * parte, direto pelo InstagramComposerModal (ver comentário lá), pra não
- * misturar a lógica de canal do composer de WhatsApp/métricas com leads que
- * também tenham telefone cadastrado além do Instagram. */
+ * análise (1º contato). Leads de `source: "internacional"` (EUA/Canadá, ver
+ * lib/international-sheet-import.ts e app/dashboard/prospeccao/internacional)
+ * usam o canal "internacional" direto, checado antes do resto: diferente do
+ * canal "instagram" (escolhido à parte, pelo InstagramComposerModal, pra não
+ * misturar com leads que têm telefone além do Instagram), aqui faz sentido
+ * decidir dentro desta função porque o canal "internacional" já é o dono do
+ * telefone/WhatsApp do lead, não uma exceção só de Instagram. Não cobre o
+ * canal "instagram": esse continua escolhido à parte (ver comentário no
+ * InstagramComposerModal.tsx). */
 export function whatsappChannelForSource(source: string | null | undefined): WhatsappChannel {
+  if (source === "internacional") return "internacional";
   return source && AUTO_WELCOME_SOURCES.has(source) ? "pago" : "ativo";
 }
 
@@ -291,6 +297,70 @@ const INSTAGRAM_NO_SHOW_TEXT =
 
 const INSTAGRAM_BREAK_OFF_TEXT =
   `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}como não tivemos retorno, vou tirar seu contato da nossa lista ativa por aqui, pra não encher seu Direct à toa. Fica o alerta: enquanto isso, outros negócios{{#categoria}} de {{categoria}}{{/categoria}} seguem ganhando espaço no Google. Se virar prioridade, é só chamar.`;
+
+/**
+ * Cadência específica pro canal "internacional" (leads com `source:
+ * "internacional"`, EUA/Canadá, ver lib/international-sheet-import.ts e
+ * app/dashboard/prospeccao/internacional/page.tsx). Mesma lógica de 8
+ * contatos da cadência principal, mas em inglês e reescrita bem mais curta:
+ * cultura de negócios dos EUA/Canadá valoriza objetividade ("time is
+ * money"), então aqui não tem `blocks` (uma única mensagem curta por
+ * contato, 1 a 3 frases, igual ao canal "instagram") nem SIGNATURE ao final.
+ * Em vez de assinatura no rodapé, a 1ª mensagem (INTL_ANALISE_TEXT) já se
+ * apresenta ("This is {{consultor}} with No Limits Marketing"), porque,
+ * diferente do Instagram Direct, um número de WhatsApp não identifica quem
+ * está mandando a mensagem sozinho. Mesmos cuidados de conteúdo do resto do
+ * arquivo, traduzidos pro inglês:
+ *  - análise (1º contato) é sempre "quick free check"/"results", nunca
+ *    "diagnosis"/"full report": o relatório completo só é mostrado ao vivo,
+ *    na reunião ("diagnostico_enviado"/"reuniao_marcada" em diante).
+ *  - nunca combina categoria + cidade do PRÓPRIO lead ao citar "another
+ *    client of ours" (ver intl_prova_social/intl_agenda_cheia), mesmo motivo
+ *    do prova_social/agenda_cheia em português: pareceria que já atendemos
+ *    um concorrente direto dele, no mesmo mercado.
+ *  - tem_perfil/tem_site não são usados aqui (mesma escolha do canal
+ *    "instagram"): manter os textos curtos pesou mais do que ramificar o tom
+ *    por esses dois campos, que só valem a pena no diagnóstico longo
+ *    (DIAGNOSTICO_IA_BLOCKS) do canal "ativo"/"pago".
+ */
+const INTL_ANALISE_TEXT =
+  `Hi{{#primeiro_nome}}, {{primeiro_nome}}{{/primeiro_nome}}!{{#consultor}} This is {{consultor}} with No Limits Marketing.{{/consultor}}{{^consultor}} This is No Limits Marketing.{{/consultor}} We ran a quick, free check on how{{#categoria}} your {{categoria}} business{{/categoria}}{{^categoria}} your business{{/categoria}}{{#cidade}} in {{cidade}}{{/cidade}} shows up on Google, and whether AI search tools like ChatGPT even mention you. Want me to send the results? Free, takes two minutes to read.`;
+
+const INTL_COBRANCA_TEXT =
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}did you get a chance to look at the free check I sent? Quick question: is your website and Google listing actually bringing you new customers right now, or is it mostly word of mouth?`;
+
+const INTL_AUTORIDADE_TEXT =
+  `Here's something worth thinking about: what would it take for{{#categoria}} your {{categoria}} business{{/categoria}}{{^categoria}} you{{/categoria}} to be the first name people find{{#cidade}} in {{cidade}}{{/cidade}}, on Google and in AI search, instead of just one of the options?`;
+
+const INTL_TICKET_MEDIO_TEXT =
+  `Quick one: if new customers started finding you directly through Google every week, on top of what you already get, what would that be worth to your bottom line?`;
+
+const INTL_ALERTA_CONCORRENCIA_TEXT =
+  `{{#concorrente}}Right now {{concorrente}} is showing up ahead of you online{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}}.{{/concorrente}}{{^concorrente}}A competitor with less experience than you is currently showing up ahead of you online.{{/concorrente}} Do you think that gap gets bigger or smaller the longer it's left alone?`;
+
+const INTL_AGENDA_CHEIA_TEXT =
+  `What would a fully booked calendar be worth to you this month? That's the kind of result{{#categoria}} {{categoria}} businesses{{/categoria}}{{^categoria}} businesses{{/categoria}} usually see once they fix this. Want me to show you how, no cost?`;
+
+const INTL_PROVA_SOCIAL_TEXT =
+  `Quick example: another client of ours{{#categoria}}, also in {{categoria}}{{/categoria}}, went from barely showing up on Google to ranking on the first page in a few months, and started getting mentioned by AI search tools too. Would a result like that make a real difference for you?`;
+
+const INTL_FECHAMENTO_TEXT =
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}last message, don't want to keep filling up your phone. Bottom line: there's real room to grow on Google and AI search, and competitors are already taking that space. If it becomes a priority, just reach out, happy to pick this back up anytime.`;
+
+const INTL_DIAGNOSTICO_ENVIADO_TEXT =
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}did you get to look at the full report I sent? I can walk you through it live in 15 minutes and show you exactly how to act on it. What's a good time this week?`;
+
+const INTL_REUNIAO_MARCADA_TEXT =
+  `We're set{{#reuniao}} for {{reuniao}}{{/reuniao}}! I'll walk you through the full report live{{#categoria}} for your {{categoria}} business{{/categoria}} and show you exactly how to grow on Google and AI search. Talk soon!`;
+
+const INTL_LEMBRETE_REUNIAO_TEXT =
+  `Quick reminder: our call is{{#reuniao}} {{reuniao}}{{/reuniao}}! I'll show you live where you're losing visibility on Google and AI search, plus a free bonus just for showing up. Can you confirm you'll be there?`;
+
+const INTL_NO_SHOW_TEXT =
+  `Looks like we missed each other at{{#reuniao}} {{reuniao}}{{/reuniao}}{{^reuniao}} our scheduled time{{/reuniao}}, no worries. Here's the short version: {{#categoria}}other {{categoria}} businesses{{/categoria}}{{^categoria}}competitors{{/categoria}}{{#cidade}} in {{cidade}}{{/cidade}} are gaining ground on Google while this sits unresolved. Want me to send the summary now, or find a new time?`;
+
+const INTL_BREAK_OFF_TEXT =
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}since I haven't heard back, I'll take you off our active list so I'm not filling up your phone for nothing. One heads-up: competitors{{#categoria}} in {{categoria}}{{/categoria}} keep gaining ground on Google and AI search while this sits on the back burner. If it becomes a priority, just reach out and we'll pick up right where we left off.`;
 
 /**
  * A cadência completa tem 8 contatos, sempre nessa ordem lógica (ver
@@ -616,22 +686,130 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     channel: "instagram",
     text: INSTAGRAM_BREAK_OFF_TEXT,
   },
+
+  // ---- Canal "internacional": cadência curta em inglês, EUA/Canadá (WhatsApp/Facebook/Instagram) ----
+  {
+    id: "intl_analise",
+    label: "1st contact: Quick free check (Google/AI)",
+    description:
+      "1º contato oficial pro canal internacional: já se apresenta (número de WhatsApp não identifica sozinho quem manda, diferente do Instagram Direct) e oferece a checagem gratuita de Google/IA, sem entregar nada ainda. Curto de propósito (cultura 'time is money').",
+    appliesTo: ["novo_lead"],
+    channel: "internacional",
+    text: INTL_ANALISE_TEXT,
+  },
+  {
+    id: "intl_cobranca",
+    label: "2nd contact: Following up",
+    description: "2º contato: pergunta se viu a checagem gratuita, com uma pergunta de Problema (SPIN), sem soar insistente.",
+    appliesTo: ["primeiro_contato"],
+    channel: "internacional",
+    text: INTL_COBRANCA_TEXT,
+  },
+  {
+    id: "intl_autoridade",
+    label: "3rd contact: Becoming the top result",
+    description: "3º contato: pergunta de valor (SPIN) sobre virar a primeira opção também no Google/IA.",
+    appliesTo: ["segundo_contato"],
+    channel: "internacional",
+    text: INTL_AUTORIDADE_TEXT,
+  },
+  {
+    id: "intl_ticket_medio",
+    label: "4th contact: Revenue impact",
+    description: "4º contato: pergunta de necessidade/benefício (SPIN) sobre faturamento vindo de clientes achados no Google.",
+    appliesTo: ["terceiro_contato"],
+    channel: "internacional",
+    text: INTL_TICKET_MEDIO_TEXT,
+  },
+  {
+    id: "intl_alerta_concorrencia",
+    label: "5th contact: Competitor alert",
+    description: "5º contato: concorrente ocupando espaço no Google/IA. Pergunta de Implicação (SPIN). Preenche automaticamente se a busca de concorrentes já rodou.",
+    appliesTo: ["quarto_contato"],
+    channel: "internacional",
+    text: INTL_ALERTA_CONCORRENCIA_TEXT,
+  },
+  {
+    id: "intl_agenda_cheia",
+    label: "6th contact: Fully booked calendar",
+    description: "6º contato: pergunta de necessidade/benefício (SPIN) sobre agenda cheia. Cita só a categoria, nunca a cidade do lead junto de 'businesses that fix this', mesmo motivo do 7º contato abaixo.",
+    appliesTo: ["quinto_contato"],
+    channel: "internacional",
+    text: INTL_AGENDA_CHEIA_TEXT,
+  },
+  {
+    id: "intl_prova_social",
+    label: "7th contact: Social proof",
+    description: "7º contato: resultado real de outro cliente. Cita só a categoria do outro cliente, nunca a cidade dele, pra não soar como se já atendêssemos um concorrente direto do próprio lead.",
+    appliesTo: ["sexto_contato"],
+    channel: "internacional",
+    text: INTL_PROVA_SOCIAL_TEXT,
+  },
+  {
+    id: "intl_fechamento",
+    label: "8th contact: Polite close",
+    description: "8º e último contato: recapitula rápido e deixa a porta aberta, sem encher o WhatsApp do lead.",
+    appliesTo: ["setimo_contato"],
+    channel: "internacional",
+    text: INTL_FECHAMENTO_TEXT,
+  },
+  {
+    id: "intl_diagnostico_enviado",
+    label: "Follow-up after full report sent (PDF)",
+    description: "Depois de enviar o relatório em PDF, puxa pra marcar os 15 minutos de explicação.",
+    appliesTo: ["diagnostico_enviado"],
+    channel: "internacional",
+    text: INTL_DIAGNOSTICO_ENVIADO_TEXT,
+  },
+  {
+    id: "intl_reuniao_marcada",
+    label: "Meeting confirmation",
+    description: "Confirmação curta pra quem já marcou a conversa do diagnóstico.",
+    appliesTo: ["reuniao_marcada"],
+    channel: "internacional",
+    text: INTL_REUNIAO_MARCADA_TEXT,
+  },
+  {
+    id: "intl_lembrete_reuniao",
+    label: "Meeting reminder (with bonus)",
+    description: "Lembrete pra mandar perto da data marcada, com o gancho do bônus exclusivo pra quem comparecer, em versão curta.",
+    appliesTo: ["reuniao_marcada"],
+    channel: "internacional",
+    text: INTL_LEMBRETE_REUNIAO_TEXT,
+  },
+  {
+    id: "intl_no_show",
+    label: "No-show rescue",
+    description: "Para quem faltou à reunião: sem cobrança, gera senso de perda em relação aos concorrentes.",
+    appliesTo: ["no_show"],
+    channel: "internacional",
+    text: INTL_NO_SHOW_TEXT,
+  },
+  {
+    id: "intl_break_off",
+    label: "Break off (polite disqualification)",
+    description: "Para quando o time decide tirar o lead da lista ativa por falta de retorno/prioridade, sem fechar a porta.",
+    appliesTo: ["desqualificado"],
+    channel: "internacional",
+    text: INTL_BREAK_OFF_TEXT,
+  },
 ];
 
 /** Modelos visíveis pra um canal específico, na ordem em que devem aparecer
  * no seletor do composer (ativos/pagos primeiro, compartilhados por último).
- * O canal "instagram" é tratado à parte, sem herdar os modelos "ambos"
- * (esses são os textos longos de WhatsApp): tem sua própria cadência curta,
- * dedicada, e sempre inclui "personalizada" (mensagem em branco), único
- * modelo "ambos" que continua fazendo sentido pra qualquer canal. */
+ * Os canais "instagram" e "internacional" são tratados à parte, sem herdar
+ * os modelos "ambos" (esses são os textos longos de WhatsApp em português):
+ * cada um tem sua própria cadência curta, dedicada, e sempre inclui
+ * "personalizada" (mensagem em branco), único modelo "ambos" que continua
+ * fazendo sentido pra qualquer canal. */
 export function getTemplatesForChannel(channel: WhatsappChannel): WhatsappTemplate[] {
-  if (channel === "instagram") {
-    // "personalizada" está definida antes da seção "instagram" no array (é
+  if (channel === "instagram" || channel === "internacional") {
+    // "personalizada" está definida antes dessas seções no array (é
     // compartilhada com os outros canais), então isolar e reanexar ao final
     // evita que "Mensagem em branco" apareça como 1ª opção no seletor.
-    const instagramTemplates = WHATSAPP_TEMPLATES.filter((t) => t.channel === "instagram");
+    const channelTemplates = WHATSAPP_TEMPLATES.filter((t) => t.channel === channel);
     const blank = WHATSAPP_TEMPLATES.find((t) => t.id === "personalizada");
-    return blank ? [...instagramTemplates, blank] : instagramTemplates;
+    return blank ? [...channelTemplates, blank] : channelTemplates;
   }
   return WHATSAPP_TEMPLATES.filter((t) => t.channel === channel || t.channel === "ambos");
 }

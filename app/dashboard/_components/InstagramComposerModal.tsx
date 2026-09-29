@@ -5,6 +5,7 @@ import { Lead } from "@/lib/types";
 import { instagramDirectUrl, instagramProfileUrl } from "@/lib/instagram";
 import {
   EDITABLE_EXTRA_KEYS,
+  WhatsappChannel,
   buildTemplateVars,
   defaultTemplateIdForStatus,
   fieldLabel,
@@ -16,11 +17,11 @@ import {
 
 const CONSULTANT_NAME_KEY = "nolimits_crm_wa_consultor_nome";
 
-function formatMeetingForMessage(iso: string | null): string {
+function formatMeetingForMessage(iso: string | null, locale: string = "pt-BR"): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString("pt-BR", {
+  return d.toLocaleString(locale, {
     weekday: "long",
     day: "2-digit",
     month: "2-digit",
@@ -46,22 +47,31 @@ function formatMeetingForMessage(iso: string | null): string {
  * derivado de `whatsappChannelForSource(lead.source)`, pra não misturar essa
  * lógica com a do composer de WhatsApp/métricas (ver comentário na própria
  * função em lib/whatsapp-templates.ts).
+ *
+ * `channel` é opcional (default "instagram") pra permitir reuso por leads
+ * `source: "internacional"` (EUA/Canadá) que também tenham Instagram
+ * cadastrado: nesse caso o dashboard passa `channel="internacional"` (ver
+ * dashboard-client.tsx) pra puxar a cadência curta em inglês em vez da
+ * cadência em português do canal "instagram", sem duplicar este componente
+ * inteiro só pra trocar o idioma dos modelos.
  */
 export default function InstagramComposerModal({
   lead,
+  channel = "instagram",
   onClose,
   onLogged,
 }: {
   lead: Lead;
+  channel?: WhatsappChannel;
   onClose: () => void;
   onLogged?: () => void;
 }) {
   const handle = lead.instagram;
-  const templatesForChannel = useMemo(() => getTemplatesForChannel("instagram"), []);
+  const templatesForChannel = useMemo(() => getTemplatesForChannel(channel), [channel]);
 
   const [consultor, setConsultor] = useState("");
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
-  const [templateId, setTemplateId] = useState(() => defaultTemplateIdForStatus(lead.status, "instagram"));
+  const [templateId, setTemplateId] = useState(() => defaultTemplateIdForStatus(lead.status, channel));
   const [blockTexts, setBlockTexts] = useState<string[]>([]);
   const [blockDirty, setBlockDirty] = useState<boolean[]>([]);
   // Mesmo "assistente" pausado do composer de WhatsApp, só que aqui o gatilho
@@ -176,9 +186,13 @@ export default function InstagramComposerModal({
     () =>
       buildTemplateVars(
         { full_name: lead.full_name, city: lead.city, category: lead.category },
-        { consultor, reuniao: formatMeetingForMessage(lead.meeting_datetime), ...extraValues }
+        {
+          consultor,
+          reuniao: formatMeetingForMessage(lead.meeting_datetime, channel === "internacional" ? "en-US" : "pt-BR"),
+          ...extraValues,
+        }
       ),
-    [lead.full_name, lead.city, lead.category, lead.meeting_datetime, consultor, extraValues]
+    [lead.full_name, lead.city, lead.category, lead.meeting_datetime, consultor, extraValues, channel]
   );
 
   const renderedBlocks = useMemo(() => renderWhatsappBlocks(template, vars), [template, vars]);

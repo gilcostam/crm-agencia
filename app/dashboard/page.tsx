@@ -15,7 +15,9 @@ export default async function DashboardPage() {
 
   // Leads de prospecção ativa (TNG Pesquisa etc.) têm menu próprio em
   // /dashboard/prospeccao — não aparecem aqui, pra manter este Kanban focado
-  // em tráfego pago/manual/Trello (ver app/dashboard/prospeccao/page.tsx).
+  // em tráfego pago/Trello (ver app/dashboard/prospeccao/page.tsx). Cadastro
+  // manual não nasce mais aqui (ver computedSource em app/api/leads/route.ts):
+  // esta tela é exclusiva pra leads que chegam de fora (Meta Ads/Trello).
   const supabase = createServiceClient();
   const { data } = await supabase
     .from("leads")
@@ -28,6 +30,10 @@ export default async function DashboardPage() {
     <DashboardClient
       initialLeads={(data as Lead[]) ?? []}
       pollQuery={`excludeSource=${ACTIVE_PROSPECTING_SOURCES.join(",")}`}
+      // Permite mover um lead que chegou por engano (ou não faz mais sentido
+      // aqui) pra Prospecção Ativa — ver enableSendToProspecting em
+      // dashboard-client.tsx.
+      enableSendToProspecting
     />
   );
 }

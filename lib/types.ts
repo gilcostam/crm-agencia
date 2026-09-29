@@ -20,13 +20,23 @@ export type LeadStatus =
  * mais antiga via scripts/import_prospeccao_csv.py) — em vez de terem chegado
  * por tráfego pago (Meta Ads), Trello ou cadastro manual. Usado pra separar
  * o Kanban de "Leads" (tráfego pago) do menu "Prospecção Ativa" no dashboard
- * (ver app/dashboard/prospeccao/page.tsx e app/api/leads/route.ts). */
-export const ACTIVE_PROSPECTING_SOURCES = ["tng_prospeccao", "prospeccao", "instagram"] as const;
+ * (ver app/dashboard/prospeccao/page.tsx e app/api/leads/route.ts).
+ * "internacional" é a janela de prospecção de leads dos EUA/Canadá (ver
+ * app/dashboard/prospeccao/internacional/page.tsx), com mensagens próprias
+ * em inglês (canal "internacional" em lib/whatsapp-templates.ts). */
+export const ACTIVE_PROSPECTING_SOURCES = [
+  "tng_prospeccao",
+  "prospeccao",
+  "instagram",
+  "internacional",
+] as const;
 
-/** Subconjunto de ACTIVE_PROSPECTING_SOURCES sem o Instagram: usado pra
- * restringir o Kanban de "Prospecção Ativa" (app/dashboard/prospeccao/page.tsx)
- * só aos leads de TNG/Maps, já que os leads de Instagram ganharam sua própria
- * janela (ver app/dashboard/prospeccao/instagram/page.tsx), com abordagem e
+/** Subconjunto de ACTIVE_PROSPECTING_SOURCES sem o Instagram e sem o
+ * internacional: usado pra restringir o Kanban de "Prospecção Ativa"
+ * (app/dashboard/prospeccao/page.tsx) só aos leads de TNG/Maps, já que os
+ * leads de Instagram e os de EUA/Canadá ganharam suas próprias janelas (ver
+ * app/dashboard/prospeccao/instagram/page.tsx e
+ * app/dashboard/prospeccao/internacional/page.tsx), com abordagem e
  * modelos de mensagem próprios (canal "instagram" em lib/whatsapp-templates.ts).
  * Não altera ACTIVE_PROSPECTING_SOURCES em si: a exclusão dos três no Kanban
  * principal (app/dashboard/page.tsx) continua igual. */

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Lead } from "@/lib/types";
 import { sanitizePhone } from "@/lib/phone";
+import { sanitizeInternationalPhone } from "@/lib/international-phone";
 import {
   EDITABLE_EXTRA_KEYS,
   buildTemplateVars,
@@ -17,11 +18,11 @@ import {
 
 const CONSULTANT_NAME_KEY = "nolimits_crm_wa_consultor_nome";
 
-function formatMeetingForMessage(iso: string | null): string {
+function formatMeetingForMessage(iso: string | null, locale: string = "pt-BR"): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleString("pt-BR", {
+  return d.toLocaleString(locale, {
     weekday: "long",
     day: "2-digit",
     month: "2-digit",
@@ -52,8 +53,11 @@ export default function WhatsAppComposerModal({
   onClose: () => void;
   onLogged?: () => void;
 }) {
-  const digits = sanitizePhone(lead.phone);
   const channel = useMemo(() => whatsappChannelForSource(lead.source), [lead.source]);
+  // Leads "internacional" (EUA/Canadá) usam NANP (código de país "1" + 10
+  // dígitos), incompatível com `sanitizePhone` (só Brasil, ver
+  // lib/international-phone.ts pro motivo de ser um módulo à parte).
+  const digits = channel === "internacional" ? sanitizeInternationalPhone(lead.phone) : sanitizePhone(lead.phone);
   const templatesForChannel = useMemo(() => getTemplatesForChannel(channel), [channel]);
 
   const [consultor, setConsultor] = useState("");
@@ -198,9 +202,13 @@ export default function WhatsAppComposerModal({
     () =>
       buildTemplateVars(
         { full_name: lead.full_name, city: lead.city, category: lead.category },
-        { consultor, reuniao: formatMeetingForMessage(lead.meeting_datetime), ...extraValues }
+        {
+          consultor,
+          reuniao: formatMeetingForMessage(lead.meeting_datetime, channel === "internacional" ? "en-US" : "pt-BR"),
+          ...extraValues,
+        }
       ),
-    [lead.full_name, lead.city, lead.category, lead.meeting_datetime, consultor, extraValues]
+    [lead.full_name, lead.city, lead.category, lead.meeting_datetime, consultor, extraValues, channel]
   );
 
   const renderedBlocks = useMemo(() => renderWhatsappBlocks(template, vars), [template, vars]);
@@ -354,6 +362,11 @@ export default function WhatsAppComposerModal({
             {channel === "pago" && (
               <p className="mt-1 text-[11px] text-emerald-600">
                 Tráfego pago: já recebeu a mensagem de boas-vindas automática.
+              </p>
+            )}
+            {channel === "internacional" && (
+              <p className="mt-1 text-[11px] text-sky-600">
+                Lead EUA/Canadá: modelos em inglês, mais curtos e diretos.
               </p>
             )}
           </div>
