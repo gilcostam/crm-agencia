@@ -301,6 +301,9 @@ const INSTAGRAM_NO_SHOW_TEXT =
 const INSTAGRAM_BREAK_OFF_TEXT =
   `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}como não tivemos retorno, vou tirar seu contato da nossa lista ativa por aqui, pra não encher seu Direct à toa. Fica o alerta: enquanto isso, outros negócios{{#categoria}} de {{categoria}}{{/categoria}} seguem ganhando espaço no Google. Se virar prioridade, é só chamar.`;
 
+const INSTAGRAM_OBJECAO_SEM_INTERESSE_TEXT =
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}sem problema! Só uma curiosidade, sem compromisso: é porque já resolveram isso de outro jeito, ou só não é prioridade agora? Se for só timing, deixo a análise separada pra quando fizer sentido dar uma olhada.`;
+
 /**
  * Cadência específica pro canal "internacional" (leads com `source:
  * "internacional"`, EUA/Canadá, ver lib/international-sheet-import.ts e
@@ -589,6 +592,17 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     blocks: BREAK_OFF_BLOCKS,
   },
   {
+    id: "objecao_sem_interesse",
+    label: "Objeção: 'não tenho interesse'",
+    description:
+      "Pra quando o lead responde direto que não tem interesse, em qualquer ponto da cadência. Em vez de argumentar contra a objeção ou insistir na reunião, faz uma pergunta aberta (SPIN, Problema) pra entender se é falta de prioridade/timing ou se já resolveram de outro jeito, e oferece uma saída de baixíssimo compromisso (deixar a análise pronta pra quando fizer sentido) em vez de forçar resposta agora. Selecione manualmente sempre que a objeção aparecer, independente do status atual do lead. Restrito ao canal \"ativo\" (prospecção ativa/cadastro manual) por pedido: não aparece nos leads de tráfego pago (Meta Ads/Trello).",
+    appliesTo: [],
+    channel: "ativo",
+    text: withSignature(
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}sem problema, entendo perfeitamente. Só uma pergunta rápida, sem compromisso nenhum: esse "não tenho interesse" é porque já resolveram isso de outro jeito, ou é porque agora não é prioridade pra vocês? Pergunto porque, se for só uma questão de momento, posso deixar a análise gratuita{{#categoria}} d{{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} separada, pronta pra quando fizer sentido revisitar o assunto, sem ficar te enchendo enquanto isso.`
+    ),
+  },
+  {
     id: "personalizada",
     label: "Mensagem em branco",
     description: "Sem modelo. Escreva do zero, usado como padrão fora do funil de contato (Contrato Assinado, Retornar Depois, Finalizado).",
@@ -711,6 +725,15 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     appliesTo: ["desqualificado"],
     channel: "instagram",
     text: INSTAGRAM_BREAK_OFF_TEXT,
+  },
+  {
+    id: "instagram_objecao_sem_interesse",
+    label: "Objeção: 'não tenho interesse'",
+    description:
+      "Pra quando o lead responde direto que não tem interesse, em qualquer ponto da cadência. Versão curta pro Direct, mesma lógica da versão em português (pergunta aberta pra entender o motivo, sem insistir na reunião). Selecione manualmente sempre que a objeção aparecer.",
+    appliesTo: [],
+    channel: "instagram",
+    text: INSTAGRAM_OBJECAO_SEM_INTERESSE_TEXT,
   },
 
   // ---- Canal "internacional": cadência curta em inglês, EUA/Canadá (WhatsApp/Facebook/Instagram) ----
