@@ -446,7 +446,7 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
     appliesTo: ["primeiro_contato"],
     channel: "ambos",
     text: withSignature(
-      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}conseguiu dar uma olhada na análise que te mandei sobre a presença de vocês no Google e nas buscas por IA? Ela mostra como{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} vocês{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} aparece hoje nessas buscas. Fico curioso: isso bate com o que você sente no dia a dia, tipo vem menos paciente novo do que gostaria, ou sobra mais horário vago na agenda do que deveria? Se preferir, me chama que já te reenvio a análise.`
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}conseguiu dar uma olhada na análise que te mandei sobre a presença de vocês no Google e nas buscas por IA? Ela mostra como{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} vocês{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} aparece hoje nessas buscas. Fico curiosa: isso bate com o que você sente no dia a dia, tipo vem menos paciente novo do que gostaria, ou sobra mais horário vago na agenda do que deveria? Se preferir, me chama que já te reenvio a análise.`
     ),
   },
   {
