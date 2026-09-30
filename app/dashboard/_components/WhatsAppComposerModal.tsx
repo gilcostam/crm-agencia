@@ -62,7 +62,9 @@ export default function WhatsAppComposerModal({
 
   const [consultor, setConsultor] = useState("");
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
-  const [templateId, setTemplateId] = useState(() => defaultTemplateIdForStatus(lead.status, channel));
+  const [templateId, setTemplateId] = useState(() =>
+    defaultTemplateIdForStatus(lead.status, channel, lead.meeting_datetime)
+  );
   // Mensagem representada como uma lista de blocos (ver renderWhatsappBlocks
   // em lib/whatsapp-templates.ts). Pra modelos sem `blocks` (a maioria), essa
   // lista sempre tem 1 item só, e a UI se comporta exatamente como antes (uma

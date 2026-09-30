@@ -152,6 +152,40 @@ export function followupUrgency(
   return "on_time";
 }
 
+export type MeetingUrgency = "distante" | "proxima" | "iminente" | "atrasada";
+
+export const MEETING_URGENCY_LABELS: Record<MeetingUrgency, string> = {
+  distante: "Reunião distante",
+  proxima: "Reunião próxima",
+  iminente: "Reunião iminente",
+  atrasada: "Reunião atrasada",
+};
+
+/** Classifica a proximidade de uma reunião marcada (`meeting_datetime`) em
+ * relação a agora, em 4 faixas: "distante" (mais de 48h de antecedência,
+ * ainda só faz sentido confirmar), "proxima" (entre 48h e 24h antes, a janela
+ * pra aguçar a curiosidade e reforçar o valor da conversa), "iminente" (24h
+ * antes até 12h depois do horário marcado, a janela do lembrete anti-no-show)
+ * e "atrasada" (mais de 12h depois do horário e o lead ainda não foi movido
+ * pra "no_show" — provavelmente precisa de reengajamento). Usada tanto pra
+ * escolher automaticamente o modelo de WhatsApp certo pra cada momento (ver
+ * defaultTemplateIdForStatus em lib/whatsapp-templates.ts) quanto pra agrupar
+ * os cards na janela de "Reuniões Marcadas" (ver app/dashboard/reunioes).
+ * Retorna `null` quando não há reunião marcada ou a data é inválida. */
+export function meetingUrgency(
+  meetingDatetime: string | null,
+  now: Date = new Date()
+): MeetingUrgency | null {
+  if (!meetingDatetime) return null;
+  const meetingTime = new Date(meetingDatetime).getTime();
+  if (Number.isNaN(meetingTime)) return null;
+  const diffHours = (meetingTime - now.getTime()) / (1000 * 60 * 60);
+  if (diffHours < 0) return diffHours >= -12 ? "iminente" : "atrasada";
+  if (diffHours <= 24) return "iminente";
+  if (diffHours <= 48) return "proxima";
+  return "distante";
+}
+
 export interface LeadEvent {
   id: string;
   lead_id: string;

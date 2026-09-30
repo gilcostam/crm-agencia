@@ -1,4 +1,4 @@
-import { LeadStatus } from "./types";
+import { LeadStatus, meetingUrgency } from "./types";
 
 /**
  * Modelos de mensagem de WhatsApp usados pelo composer manual (ver
@@ -292,6 +292,9 @@ const INSTAGRAM_REUNIAO_MARCADA_TEXT =
 const INSTAGRAM_LEMBRETE_REUNIAO_TEXT =
   `Lembrete rápido: nossa conversa é{{#reuniao}} {{reuniao}}{{/reuniao}}! Vou te mostrar ao vivo as oportunidades no Google pra crescerem além do Instagram, e quem comparecer garante um bônus exclusivo. Confirma presença?`;
 
+const INSTAGRAM_CURIOSIDADE_REUNIAO_TEXT =
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}enquanto isso já fui adiantando algo aqui: achei um ponto específico{{#categoria}} d{{categoria}}{{/categoria}} no Google que pretendo te mostrar na nossa conversa{{#reuniao}} de {{reuniao}}{{/reuniao}}. Não é nada que dá pra resolver só com Instagram. Vale muito a pena reservar esse horário 👀`;
+
 const INSTAGRAM_NO_SHOW_TEXT =
   `Não consegui falar com você no horário combinado, sem problema! Separei um resumo rápido do que encontramos: hoje{{#categoria}} outros negócios de {{categoria}}{{/categoria}}{{^categoria}} outros concorrentes{{/categoria}} vêm ganhando mais espaço no Google. Quer que eu te mande agora, ou prefere remarcar?`;
 
@@ -355,6 +358,9 @@ const INTL_REUNIAO_MARCADA_TEXT =
 
 const INTL_LEMBRETE_REUNIAO_TEXT =
   `Quick reminder: our call is{{#reuniao}} {{reuniao}}{{/reuniao}}! I'll show you live where you're losing visibility on Google and AI search, plus a free bonus just for showing up. Can you confirm you'll be there?`;
+
+const INTL_CURIOSIDADE_REUNIAO_TEXT =
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}quick heads-up before our call{{#reuniao}} on {{reuniao}}{{/reuniao}}: I found something specific{{#categoria}} about your {{categoria}} business{{/categoria}} online that I want to walk you through live, it's costing you customers right now without you knowing. Worth clearing your calendar for this one.`;
 
 const INTL_NO_SHOW_TEXT =
   `Looks like we missed each other at{{#reuniao}} {{reuniao}}{{/reuniao}}{{^reuniao}} our scheduled time{{/reuniao}}, no worries. Here's the short version: {{#categoria}}other {{categoria}} businesses{{/categoria}}{{^categoria}}competitors{{/categoria}}{{#cidade}} in {{cidade}}{{/cidade}} are gaining ground on Google while this sits unresolved. Want me to send the summary now, or find a new time?`;
@@ -532,6 +538,17 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
     ),
   },
   {
+    id: "curiosidade_reuniao",
+    label: "Aquece antes da reunião (curiosidade)",
+    description:
+      "Pra mandar no meio do caminho entre marcar e a data da reunião (nem confirmação recente, nem lembrete de véspera): aguça a curiosidade sobre um achado específico, sem entregar o diagnóstico, pra manter o lead 'quente' até lá.",
+    appliesTo: ["reuniao_marcada"],
+    channel: "ambos",
+    text: withSignature(
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}enquanto isso vou adiantando algo aqui: encontrei um ponto bem específico{{#categoria}} d{{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} no Google que pretendo te mostrar direitinho na nossa conversa{{#reuniao}} de {{reuniao}}{{/reuniao}} — algo que pode estar custando pacientes pra vocês sem que percebam. Vale muito a pena reservar esse horário, prometo que não vai ser "só mais uma reunião". Nos falamos lá!`
+    ),
+  },
+  {
     id: "lembrete_reuniao",
     label: "Lembrete de reunião (com bônus)",
     description:
@@ -663,6 +680,15 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     text: INSTAGRAM_REUNIAO_MARCADA_TEXT,
   },
   {
+    id: "instagram_curiosidade_reuniao",
+    label: "Aquece antes da reunião (curiosidade)",
+    description:
+      "Pra mandar no meio do caminho entre marcar e a data da reunião: aguça a curiosidade sobre um achado específico, sem entregar o diagnóstico, versão curta pro Direct.",
+    appliesTo: ["reuniao_marcada"],
+    channel: "instagram",
+    text: INSTAGRAM_CURIOSIDADE_REUNIAO_TEXT,
+  },
+  {
     id: "instagram_lembrete_reuniao",
     label: "Lembrete de reunião (com bônus)",
     description: "Lembrete pra mandar perto da data marcada, com o gancho do bônus exclusivo pra quem comparecer, em versão curta.",
@@ -770,6 +796,15 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     text: INTL_REUNIAO_MARCADA_TEXT,
   },
   {
+    id: "intl_curiosidade_reuniao",
+    label: "Warm-up before the call (curiosity)",
+    description:
+      "To send in the gap between booking and the meeting date: teases a specific finding without giving away the diagnosis, keeps the lead engaged until the call.",
+    appliesTo: ["reuniao_marcada"],
+    channel: "internacional",
+    text: INTL_CURIOSIDADE_REUNIAO_TEXT,
+  },
+  {
     id: "intl_lembrete_reuniao",
     label: "Meeting reminder (with bonus)",
     description: "Lembrete pra mandar perto da data marcada, com o gancho do bônus exclusivo pra quem comparecer, em versão curta.",
@@ -814,10 +849,30 @@ export function getTemplatesForChannel(channel: WhatsappChannel): WhatsappTempla
   return WHATSAPP_TEMPLATES.filter((t) => t.channel === channel || t.channel === "ambos");
 }
 
-export function defaultTemplateIdForStatus(status: LeadStatus, channel: WhatsappChannel): string {
+/** Escolhe o modelo padrão a sugerir no composer pro status atual do lead.
+ * Pra "reuniao_marcada" existem 3 estágios cadastrados nessa ordem, pra cada
+ * canal (ver WHATSAPP_TEMPLATES acima: confirmação, aquecimento de
+ * curiosidade, lembrete anti-no-show) — `meetingDatetime` (opcional,
+ * retrocompatível: sem ele, sempre cai no 1º = confirmação, igual ao
+ * comportamento antigo) deixa a escolha automática seguir a proximidade real
+ * da reunião (ver meetingUrgency em lib/types.ts), pra não deixar o lead
+ * esfriar entre marcar e comparecer: "distante" ainda é só confirmação,
+ * "proxima" vira o aquecimento de curiosidade, e "iminente"/"atrasada" já
+ * pedem o lembrete com bônus (o mais eficaz contra no-show). */
+export function defaultTemplateIdForStatus(
+  status: LeadStatus,
+  channel: WhatsappChannel,
+  meetingDatetime?: string | null
+): string {
   const templates = getTemplatesForChannel(channel);
-  const match = templates.find((t) => t.appliesTo.includes(status));
-  return match ? match.id : "personalizada";
+  const matches = templates.filter((t) => t.appliesTo.includes(status));
+  if (matches.length === 0) return "personalizada";
+  if (status === "reuniao_marcada" && matches.length > 1) {
+    const urgency = meetingUrgency(meetingDatetime ?? null);
+    if (urgency === "proxima") return matches[1].id;
+    if (urgency === "iminente" || urgency === "atrasada") return matches[matches.length - 1].id;
+  }
+  return matches[0].id;
 }
 
 export function getTemplate(id: string): WhatsappTemplate {

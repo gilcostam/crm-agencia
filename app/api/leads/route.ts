@@ -11,7 +11,10 @@ import { parseInstagramHandle } from "@/lib/instagram";
  * carregou inicialmente: `?source=a,b` inclui só esses `source`, `?excludeSource=a,b`
  * exclui esses `source` (mutuamente exclusivos — se os dois vierem, `source`
  * tem prioridade). Sem nenhum dos dois, retorna todos os leads (comportamento
- * de sempre). */
+ * de sempre). `?status=a,b` filtra por status (cruza com o filtro de source
+ * acima, quando os dois vierem) — usado pela janela de "Reuniões Marcadas"
+ * (ver app/dashboard/reunioes/page.tsx), que junta leads de qualquer source
+ * desde que estejam com `status: "reuniao_marcada"`. */
 export async function GET(request: NextRequest) {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
@@ -23,6 +26,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const includeSource = searchParams.get("source");
   const excludeSource = searchParams.get("excludeSource");
+  const statusFilter = searchParams.get("status");
 
   const supabase = createServiceClient();
   let query = supabase
@@ -34,6 +38,10 @@ export async function GET(request: NextRequest) {
     query = query.in("source", includeSource.split(","));
   } else if (excludeSource) {
     query = query.not("source", "in", `(${excludeSource.split(",").join(",")})`);
+  }
+
+  if (statusFilter) {
+    query = query.in("status", statusFilter.split(","));
   }
 
   const { data, error } = await query.order("created_at", { ascending: false });

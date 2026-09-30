@@ -9,9 +9,12 @@ import {
   LeadAttachment,
   LeadEvent,
   LeadStatus,
+  MEETING_URGENCY_LABELS,
+  MeetingUrgency,
   STATUS_LABELS,
   STATUS_ORDER,
   followupUrgency,
+  meetingUrgency,
 } from "@/lib/types";
 import { sanitizePhone } from "@/lib/phone";
 import { sanitizeInternationalPhone } from "@/lib/international-phone";
@@ -41,7 +44,7 @@ function nextMessageLabelForLead(lead: Lead): string | null {
       : lead.instagram
         ? "instagram"
         : whatsappChannelForSource(lead.source);
-  const templateId = defaultTemplateIdForStatus(lead.status, channel);
+  const templateId = defaultTemplateIdForStatus(lead.status, channel, lead.meeting_datetime);
   if (templateId === "personalizada") return null;
   return getTemplate(templateId).label;
 }
@@ -115,6 +118,25 @@ const FOLLOWUP_BADGE_STYLES: Record<FollowupUrgency, string> = {
   due_today: "bg-yellow-100 text-yellow-800",
   overdue: "bg-red-100 text-red-700",
 };
+
+/** Cor do badge "Reunião {data}" no card do Kanban, de acordo com a
+ * proximidade calculada por `meetingUrgency` (lib/types.ts) — mesma escala de
+ * cores do FOLLOWUP_BADGE_STYLES acima, mas com um 4º nível ("iminente", em
+ * laranja) entre o "ainda dá tempo" (âmbar) e o "já passou" (vermelho),
+ * porque as próximas 24h em torno da reunião pedem atenção redobrada
+ * (janela do lembrete anti-no-show). */
+const MEETING_URGENCY_BADGE_STYLES: Record<MeetingUrgency, string> = {
+  distante: "bg-amber-100 text-amber-700",
+  proxima: "bg-sky-100 text-sky-700",
+  iminente: "bg-orange-100 text-orange-700",
+  atrasada: "bg-red-100 text-red-700",
+};
+
+/** Ordem de exibição das colunas na janela de "Reuniões Marcadas" (ver
+ * app/dashboard/reunioes/page.tsx) quando `groupByMeetingUrgency` está
+ * ativo — da mais urgente pra mais distante, pra quem abre a tela já ver
+ * primeiro quem precisa de atenção agora. */
+const MEETING_URGENCY_ORDER: MeetingUrgency[] = ["iminente", "atrasada", "proxima", "distante"];
 
 function formatBytes(bytes: number | null | undefined): string {
   if (!bytes) return "";
@@ -1086,6 +1108,7 @@ export default function DashboardClient({
   enableInternationalSheetImport = false,
   enableSendToProspecting = false,
   defaultLeadSource,
+  groupByMeetingUrgency = false,
 }: {
   initialLeads: Lead[];
   /** Título exibido no cabeçalho da página (ex.: "Prospecção Ativa" na tela
@@ -1125,6 +1148,13 @@ export default function DashboardClient({
    * dentro da tela de Prospecção EUA/Canadá cairia em "manual" e sumiria do
    * filtro dessa tela (e dos modelos em inglês) assim que a página recarregar. */
   defaultLeadSource?: string;
+  /** Troca o agrupamento em colunas de "por status" (STATUS_ORDER, o padrão)
+   * pra "por proximidade da reunião" (MEETING_URGENCY_ORDER, ver
+   * meetingUrgency em lib/types.ts) — usado só na janela de "Reuniões
+   * Marcadas" (app/dashboard/reunioes/page.tsx), onde todo lead já está em
+   * `status: "reuniao_marcada"`, então colunas por status não separariam
+   * nada; colunas por urgência é que mostram quem precisa de atenção agora. */
+  groupByMeetingUrgency?: boolean;
 }) {
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -1728,6 +1758,199 @@ export default function DashboardClient({
   const composerLead = leads.find((l) => l.id === composerLeadId) ?? null;
   const instagramComposerLead = leads.find((l) => l.id === instagramComposerLeadId) ?? null;
 
+  // Card do lead, reaproveitado tanto no agrupamento padrão por status
+  // (STATUS_ORDER) quanto no agrupamento por proximidade de reunião
+  // (MEETING_URGENCY_ORDER, ver groupByMeetingUrgency) — o card em si nunca
+  // muda entre os dois modos, só a coluna em que ele aparece.
+  function renderLeadCard(lead: Lead) {
+    const wa = leadHasWhatsappNumber(lead);
+    const stale =
+      STALE_STATUSES.includes(lead.status) &&
+      daysSince(lead.updated_at) >= STALE_DAYS_THRESHOLD;
+    const duplicates = duplicatesOf(lead);
+    const nextMessage = nextMessageLabelForLead(lead);
+    return (
+      <div
+        key={lead.id}
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.setData("text/plain", lead.id);
+          e.dataTransfer.effectAllowed = "move";
+        }}
+        onClick={() => setSelectedLeadId(lead.id)}
+        className={`cursor-grab rounded-md border border-neutral-200 p-3 transition active:cursor-grabbing ${
+          flashIds.has(lead.id)
+            ? "border-emerald-400 bg-emerald-50"
+            : "bg-neutral-50 hover:bg-neutral-100"
+        }`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-sm font-medium text-neutral-900">
+            {lead.full_name || "Sem nome"}
+          </p>
+          <div className="flex shrink-0 gap-1">
+            {wa && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setComposerLeadId(lead.id);
+                }}
+                title="Conversar no WhatsApp"
+                className="shrink-0 rounded-full bg-emerald-500 p-1.5 text-white hover:bg-emerald-600"
+              >
+                <WhatsAppIcon />
+              </button>
+            )}
+            {lead.instagram && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setInstagramComposerLeadId(lead.id);
+                }}
+                title="Conversar no Instagram"
+                className="shrink-0 rounded-full bg-fuchsia-600 p-1.5 text-white hover:bg-fuchsia-700"
+              >
+                📷
+              </button>
+            )}
+          </div>
+        </div>
+        {lead.phone && (
+          <p className="text-xs text-neutral-500">{lead.phone}</p>
+        )}
+        {lead.instagram && (
+          <p className="text-xs text-neutral-500">@{lead.instagram}</p>
+        )}
+        {lead.city && (
+          <p className="truncate text-xs text-neutral-500">
+            {lead.city}
+            {lead.category ? ` · ${lead.category}` : ""}
+          </p>
+        )}
+        {nextMessage && (
+          <p className="mt-1 truncate text-[10px] font-medium text-indigo-700">
+            ➜ Próxima msg: {nextMessage}
+          </p>
+        )}
+        {lead.status === "novo_lead" && lead.category && lead.city && (
+          <div className="mt-1.5 border-t border-neutral-200 pt-1.5">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                searchCompetitorsForLead(lead);
+              }}
+              disabled={competitorPanels[lead.id]?.searching}
+              className="text-[10px] font-medium text-sky-700 underline decoration-dotted hover:text-sky-900 disabled:opacity-50"
+            >
+              {competitorPanels[lead.id]?.searching
+                ? "Buscando concorrentes..."
+                : "Buscar concorrentes no Google"}
+            </button>
+            {competitorPanels[lead.id]?.error && (
+              <p className="mt-0.5 text-[10px] text-amber-700">
+                {competitorPanels[lead.id]?.error}
+              </p>
+            )}
+            {competitorPanels[lead.id]?.topName && (
+              <p className="mt-0.5 text-[10px] text-neutral-600">
+                À frente: <strong>{competitorPanels[lead.id]?.topName}</strong>
+                {competitorPanels[lead.id]?.topRating
+                  ? ` (${competitorPanels[lead.id]?.topRating})`
+                  : ""}
+              </p>
+            )}
+            {competitorPanels[lead.id]?.profileNote && (
+              <p
+                className={`mt-0.5 text-[10px] ${
+                  competitorPanels[lead.id]?.hasProfile
+                    ? "font-medium text-emerald-700"
+                    : "font-medium text-amber-700"
+                }`}
+              >
+                {competitorPanels[lead.id]?.profileNote}
+              </p>
+            )}
+            {competitorPanels[lead.id]?.siteNote && (
+              <p className="mt-0.5 text-[10px] font-medium text-amber-700">
+                {competitorPanels[lead.id]?.siteNote}
+              </p>
+            )}
+          </div>
+        )}
+        <p className="mt-1 text-[10px] uppercase tracking-wide text-neutral-400">
+          {lead.source} · {formatDate(lead.created_at)}
+        </p>
+        {lead.monthly_value !== null && (
+          <p className="text-xs font-medium text-emerald-700">
+            {formatCurrency(lead.monthly_value)}/mês
+          </p>
+        )}
+        <div className="mt-1 flex flex-wrap gap-1">
+          {lead.meeting_datetime && (() => {
+            const urgency = meetingUrgency(lead.meeting_datetime) ?? "distante";
+            return (
+              <span
+                className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${MEETING_URGENCY_BADGE_STYLES[urgency]}`}
+              >
+                Reunião {formatDate(lead.meeting_datetime)}
+              </span>
+            );
+          })()}
+          {lead.next_followup && (() => {
+            const urgency = followupUrgency(lead.next_followup, today) ?? "on_time";
+            const formattedDate = new Date(`${lead.next_followup}T00:00:00`).toLocaleDateString("pt-BR");
+            const label =
+              urgency === "due_today"
+                ? "Follow-up hoje"
+                : urgency === "overdue"
+                ? `Atrasado desde ${formattedDate}`
+                : `Follow-up ${formattedDate}`;
+            return (
+              <span
+                className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${FOLLOWUP_BADGE_STYLES[urgency]}`}
+              >
+                {label}
+              </span>
+            );
+          })()}
+          {stale && (
+            <span className="inline-block rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-700">
+              Sem contato há {daysSince(lead.updated_at)}d
+            </span>
+          )}
+          {duplicates.length > 0 && (
+            <span
+              title={`Possível duplicata: ${duplicates
+                .map((d) => d.full_name || "sem nome")
+                .join(", ")}`}
+              className="inline-block rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700"
+            >
+              Possível duplicata
+            </span>
+          )}
+        </div>
+
+        <select
+          value={lead.status}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) =>
+            updateStatus(lead.id, e.target.value as LeadStatus)
+          }
+          className="mt-2 w-full rounded border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-700"
+        >
+          {STATUS_ORDER.map((s) => (
+            <option key={s} value={s}>
+              {STATUS_LABELS[s]}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-neutral-100">
       <header className="border-b border-neutral-200 bg-white">
@@ -2105,232 +2328,78 @@ export default function DashboardClient({
             embaixo — útil aqui porque as colunas podem ficar bem altas. */}
         <div className="overflow-x-auto pb-2" style={{ transform: "scaleY(-1)" }}>
         <div className="flex min-w-min gap-4" style={{ transform: "scaleY(-1)" }}>
-          {STATUS_ORDER.map((status) => {
-            const columnLeads = filteredLeads.filter((l) => l.status === status);
-            return (
-              <div
-                key={status}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect = "move";
-                  setDragOverStatus(status);
-                }}
-                onDragLeave={() =>
-                  setDragOverStatus((s) => (s === status ? null : s))
-                }
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const leadId = e.dataTransfer.getData("text/plain");
-                  if (leadId) updateStatus(leadId, status);
-                  setDragOverStatus(null);
-                }}
-                className={`w-72 shrink-0 rounded-lg bg-white p-3 shadow-sm transition ${
-                  dragOverStatus === status ? "ring-2 ring-neutral-900" : ""
-                }`}
-              >
-                <div className="mb-3 flex items-center justify-between px-1">
-                  <h2 className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-                    {STATUS_LABELS[status]}
-                  </h2>
-                  <span className="text-xs text-neutral-400">
-                    {columnLeads.length}
-                  </span>
-                </div>
-
-                <div className="space-y-2">
-                  {columnLeads.length === 0 && (
-                    <p className="px-1 py-6 text-center text-xs text-neutral-400">
-                      Sem leads
-                    </p>
-                  )}
-
-                  {columnLeads.map((lead) => {
-                    const wa = leadHasWhatsappNumber(lead);
-                    const stale =
-                      STALE_STATUSES.includes(lead.status) &&
-                      daysSince(lead.updated_at) >= STALE_DAYS_THRESHOLD;
-                    const duplicates = duplicatesOf(lead);
-                    const nextMessage = nextMessageLabelForLead(lead);
-                    return (
-                      <div
-                        key={lead.id}
-                        draggable
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData("text/plain", lead.id);
-                          e.dataTransfer.effectAllowed = "move";
-                        }}
-                        onClick={() => setSelectedLeadId(lead.id)}
-                        className={`cursor-grab rounded-md border border-neutral-200 p-3 transition active:cursor-grabbing ${
-                          flashIds.has(lead.id)
-                            ? "border-emerald-400 bg-emerald-50"
-                            : "bg-neutral-50 hover:bg-neutral-100"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="text-sm font-medium text-neutral-900">
-                            {lead.full_name || "Sem nome"}
-                          </p>
-                          <div className="flex shrink-0 gap-1">
-                            {wa && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setComposerLeadId(lead.id);
-                                }}
-                                title="Conversar no WhatsApp"
-                                className="shrink-0 rounded-full bg-emerald-500 p-1.5 text-white hover:bg-emerald-600"
-                              >
-                                <WhatsAppIcon />
-                              </button>
-                            )}
-                            {lead.instagram && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setInstagramComposerLeadId(lead.id);
-                                }}
-                                title="Conversar no Instagram"
-                                className="shrink-0 rounded-full bg-fuchsia-600 p-1.5 text-white hover:bg-fuchsia-700"
-                              >
-                                📷
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                        {lead.phone && (
-                          <p className="text-xs text-neutral-500">{lead.phone}</p>
-                        )}
-                        {lead.instagram && (
-                          <p className="text-xs text-neutral-500">@{lead.instagram}</p>
-                        )}
-                        {lead.city && (
-                          <p className="truncate text-xs text-neutral-500">
-                            {lead.city}
-                            {lead.category ? ` · ${lead.category}` : ""}
-                          </p>
-                        )}
-                        {nextMessage && (
-                          <p className="mt-1 truncate text-[10px] font-medium text-indigo-700">
-                            ➜ Próxima msg: {nextMessage}
-                          </p>
-                        )}
-                        {lead.status === "novo_lead" && lead.category && lead.city && (
-                          <div className="mt-1.5 border-t border-neutral-200 pt-1.5">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                searchCompetitorsForLead(lead);
-                              }}
-                              disabled={competitorPanels[lead.id]?.searching}
-                              className="text-[10px] font-medium text-sky-700 underline decoration-dotted hover:text-sky-900 disabled:opacity-50"
-                            >
-                              {competitorPanels[lead.id]?.searching
-                                ? "Buscando concorrentes..."
-                                : "Buscar concorrentes no Google"}
-                            </button>
-                            {competitorPanels[lead.id]?.error && (
-                              <p className="mt-0.5 text-[10px] text-amber-700">
-                                {competitorPanels[lead.id]?.error}
-                              </p>
-                            )}
-                            {competitorPanels[lead.id]?.topName && (
-                              <p className="mt-0.5 text-[10px] text-neutral-600">
-                                À frente: <strong>{competitorPanels[lead.id]?.topName}</strong>
-                                {competitorPanels[lead.id]?.topRating
-                                  ? ` (${competitorPanels[lead.id]?.topRating})`
-                                  : ""}
-                              </p>
-                            )}
-                            {competitorPanels[lead.id]?.profileNote && (
-                              <p
-                                className={`mt-0.5 text-[10px] ${
-                                  competitorPanels[lead.id]?.hasProfile
-                                    ? "font-medium text-emerald-700"
-                                    : "font-medium text-amber-700"
-                                }`}
-                              >
-                                {competitorPanels[lead.id]?.profileNote}
-                              </p>
-                            )}
-                            {competitorPanels[lead.id]?.siteNote && (
-                              <p className="mt-0.5 text-[10px] font-medium text-amber-700">
-                                {competitorPanels[lead.id]?.siteNote}
-                              </p>
-                            )}
-                          </div>
-                        )}
-                        <p className="mt-1 text-[10px] uppercase tracking-wide text-neutral-400">
-                          {lead.source} · {formatDate(lead.created_at)}
+          {groupByMeetingUrgency
+            ? MEETING_URGENCY_ORDER.map((urgency) => {
+                const columnLeads = filteredLeads
+                  .filter((l) => meetingUrgency(l.meeting_datetime) === urgency)
+                  .sort(
+                    (a, b) =>
+                      new Date(a.meeting_datetime as string).getTime() -
+                      new Date(b.meeting_datetime as string).getTime()
+                  );
+                return (
+                  <div key={urgency} className="w-72 shrink-0 rounded-lg bg-white p-3 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between px-1">
+                      <h2 className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                        {MEETING_URGENCY_LABELS[urgency]}
+                      </h2>
+                      <span className="text-xs text-neutral-400">{columnLeads.length}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {columnLeads.length === 0 && (
+                        <p className="px-1 py-6 text-center text-xs text-neutral-400">
+                          Sem leads
                         </p>
-                        {lead.monthly_value !== null && (
-                          <p className="text-xs font-medium text-emerald-700">
-                            {formatCurrency(lead.monthly_value)}/mês
-                          </p>
-                        )}
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {lead.meeting_datetime && (
-                            <span className="inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-                              Reunião {formatDate(lead.meeting_datetime)}
-                            </span>
-                          )}
-                          {lead.next_followup && (() => {
-                            const urgency = followupUrgency(lead.next_followup, today) ?? "on_time";
-                            const formattedDate = new Date(`${lead.next_followup}T00:00:00`).toLocaleDateString("pt-BR");
-                            const label =
-                              urgency === "due_today"
-                                ? "Follow-up hoje"
-                                : urgency === "overdue"
-                                ? `Atrasado desde ${formattedDate}`
-                                : `Follow-up ${formattedDate}`;
-                            return (
-                              <span
-                                className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-medium ${FOLLOWUP_BADGE_STYLES[urgency]}`}
-                              >
-                                {label}
-                              </span>
-                            );
-                          })()}
-                          {stale && (
-                            <span className="inline-block rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-700">
-                              Sem contato há {daysSince(lead.updated_at)}d
-                            </span>
-                          )}
-                          {duplicates.length > 0 && (
-                            <span
-                              title={`Possível duplicata: ${duplicates
-                                .map((d) => d.full_name || "sem nome")
-                                .join(", ")}`}
-                              className="inline-block rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700"
-                            >
-                              Possível duplicata
-                            </span>
-                          )}
-                        </div>
+                      )}
+                      {columnLeads.map((lead) => renderLeadCard(lead))}
+                    </div>
+                  </div>
+                );
+              })
+            : STATUS_ORDER.map((status) => {
+                const columnLeads = filteredLeads.filter((l) => l.status === status);
+                return (
+                  <div
+                    key={status}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      setDragOverStatus(status);
+                    }}
+                    onDragLeave={() =>
+                      setDragOverStatus((s) => (s === status ? null : s))
+                    }
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const leadId = e.dataTransfer.getData("text/plain");
+                      if (leadId) updateStatus(leadId, status);
+                      setDragOverStatus(null);
+                    }}
+                    className={`w-72 shrink-0 rounded-lg bg-white p-3 shadow-sm transition ${
+                      dragOverStatus === status ? "ring-2 ring-neutral-900" : ""
+                    }`}
+                  >
+                    <div className="mb-3 flex items-center justify-between px-1">
+                      <h2 className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                        {STATUS_LABELS[status]}
+                      </h2>
+                      <span className="text-xs text-neutral-400">
+                        {columnLeads.length}
+                      </span>
+                    </div>
 
-                        <select
-                          value={lead.status}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) =>
-                            updateStatus(lead.id, e.target.value as LeadStatus)
-                          }
-                          className="mt-2 w-full rounded border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-700"
-                        >
-                          {STATUS_ORDER.map((s) => (
-                            <option key={s} value={s}>
-                              {STATUS_LABELS[s]}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
+                    <div className="space-y-2">
+                      {columnLeads.length === 0 && (
+                        <p className="px-1 py-6 text-center text-xs text-neutral-400">
+                          Sem leads
+                        </p>
+                      )}
+
+                      {columnLeads.map((lead) => renderLeadCard(lead))}
+                    </div>
+                  </div>
+                );
+              })}
         </div>
         </div>
       </main>

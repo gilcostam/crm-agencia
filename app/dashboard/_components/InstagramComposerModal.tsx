@@ -71,7 +71,9 @@ export default function InstagramComposerModal({
 
   const [consultor, setConsultor] = useState("");
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
-  const [templateId, setTemplateId] = useState(() => defaultTemplateIdForStatus(lead.status, channel));
+  const [templateId, setTemplateId] = useState(() =>
+    defaultTemplateIdForStatus(lead.status, channel, lead.meeting_datetime)
+  );
   const [blockTexts, setBlockTexts] = useState<string[]>([]);
   const [blockDirty, setBlockDirty] = useState<boolean[]>([]);
   // Mesmo "assistente" pausado do composer de WhatsApp, só que aqui o gatilho

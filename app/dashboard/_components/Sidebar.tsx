@@ -6,6 +6,7 @@ import Link from "next/link";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Leads", icon: LeadsIcon },
+  { href: "/dashboard/reunioes", label: "Reuniões Marcadas", icon: MeetingIcon },
   { href: "/dashboard/prospeccao", label: "Prospecção Ativa", icon: ProspeccaoIcon },
   { href: "/dashboard/prospeccao/instagram", label: "Prospecção Instagram", icon: InstagramIcon },
   { href: "/dashboard/prospeccao/internacional", label: "Prospecção EUA/Canadá", icon: GlobeIcon },
@@ -21,6 +22,16 @@ function LeadsIcon() {
       <rect x="2.5" y="4" width="4.2" height="12" rx="1" />
       <rect x="7.9" y="4" width="4.2" height="8" rx="1" />
       <rect x="13.3" y="4" width="4.2" height="15" rx="1" />
+    </svg>
+  );
+}
+
+function MeetingIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      <rect x="2.5" y="3.5" width="15" height="14" rx="1.5" />
+      <path d="M2.5 8h15M6 2v3M14 2v3" strokeLinecap="round" />
+      <circle cx="10" cy="13" r="2" />
     </svg>
   );
 }
