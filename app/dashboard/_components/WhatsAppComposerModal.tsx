@@ -6,11 +6,13 @@ import { sanitizePhone } from "@/lib/phone";
 import { sanitizeInternationalPhone } from "@/lib/international-phone";
 import {
   EDITABLE_EXTRA_KEYS,
+  WhatsappLanguage,
   buildTemplateVars,
   defaultTemplateIdForStatus,
   fieldLabel,
   getTemplate,
   getTemplatesForChannel,
+  pickTemplateText,
   renderWhatsappBlocks,
   templateUsesVar,
   whatsappChannelForSource,
@@ -59,6 +61,32 @@ export default function WhatsAppComposerModal({
   // lib/international-phone.ts pro motivo de ser um módulo à parte).
   const digits = channel === "internacional" ? sanitizeInternationalPhone(lead.phone) : sanitizePhone(lead.phone);
   const templatesForChannel = useMemo(() => getTemplatesForChannel(channel), [channel]);
+
+  // Idioma da abordagem, só relevante (e só exibido) pro canal
+  // "internacional" (ver WhatsappLanguage em lib/whatsapp-templates.ts):
+  // muitos desses leads são donos de negócio brasileiros morando nos
+  // EUA/Canadá, que preferem ser abordados em português. Parte do valor já
+  // salvo no lead (ex.: vindo da planilha de importação, ver
+  // lib/international-sheet-import.ts), com "en" como padrão quando ausente
+  // (preserva o comportamento original da cadência internacional). Trocar
+  // aqui já re-renderiza a mensagem (ver `vars`/`renderedBlocks` abaixo) e
+  // persiste a escolha no lead, pra lembrar da próxima vez que o composer
+  // abrir pra ele.
+  const [language, setLanguage] = useState<WhatsappLanguage>(() =>
+    lead.outreach_language === "pt" ? "pt" : "en"
+  );
+
+  function handleLanguageChange(next: WhatsappLanguage) {
+    setLanguage(next);
+    fetch(`/api/leads/${lead.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ outreach_language: next }),
+    }).catch(() => {
+      // Melhor esforço: se falhar, a mensagem já está no idioma certo nesta
+      // sessão, só não vai lembrar da escolha da próxima vez que abrir.
+    });
+  }
 
   const [consultor, setConsultor] = useState("");
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
@@ -196,8 +224,8 @@ export default function WhatsAppComposerModal({
   // inputs extras, pra não poluir o composer com campos que a mensagem
   // atual nem referencia.
   const extraKeysForTemplate = useMemo(
-    () => EDITABLE_EXTRA_KEYS.filter((key) => templateUsesVar(template.text, key)),
-    [template.text]
+    () => EDITABLE_EXTRA_KEYS.filter((key) => templateUsesVar(pickTemplateText(template, language), key)),
+    [template, language]
   );
 
   const vars = useMemo(
@@ -206,14 +234,23 @@ export default function WhatsAppComposerModal({
         { full_name: lead.full_name, city: lead.city, category: lead.category },
         {
           consultor,
-          reuniao: formatMeetingForMessage(lead.meeting_datetime, channel === "internacional" ? "en-US" : "pt-BR"),
+          // Formata a data/hora no idioma da mensagem em si: internacional
+          // em inglês usa "en-US", mas internacional em português (ver
+          // `language`) deve soar igual ao resto da frase, em português.
+          reuniao: formatMeetingForMessage(
+            lead.meeting_datetime,
+            channel === "internacional" && language === "en" ? "en-US" : "pt-BR"
+          ),
           ...extraValues,
         }
       ),
-    [lead.full_name, lead.city, lead.category, lead.meeting_datetime, consultor, extraValues, channel]
+    [lead.full_name, lead.city, lead.category, lead.meeting_datetime, consultor, extraValues, channel, language]
   );
 
-  const renderedBlocks = useMemo(() => renderWhatsappBlocks(template, vars), [template, vars]);
+  const renderedBlocks = useMemo(
+    () => renderWhatsappBlocks(template, vars, language),
+    [template, vars, language]
+  );
 
   // Regera os blocos a partir do modelo quando o modelo muda (ou os dados
   // usados nele mudam), mas só pros blocos que o usuário não tiver editado
@@ -367,9 +404,31 @@ export default function WhatsAppComposerModal({
               </p>
             )}
             {channel === "internacional" && (
-              <p className="mt-1 text-[11px] text-sky-600">
-                Lead EUA/Canadá: modelos em inglês, mais curtos e diretos.
-              </p>
+              <div className="mt-1.5">
+                <p className="text-[11px] text-sky-600">
+                  Lead EUA/Canadá: modelos curtos e diretos. Útil pra quem é brasileiro morando lá: escolha o idioma.
+                </p>
+                <div className="mt-1 inline-flex overflow-hidden rounded-md border border-sky-300">
+                  <button
+                    type="button"
+                    onClick={() => handleLanguageChange("en")}
+                    className={`px-2 py-0.5 text-[11px] font-medium ${
+                      language === "en" ? "bg-sky-600 text-white" : "bg-white text-sky-700 hover:bg-sky-50"
+                    }`}
+                  >
+                    English
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLanguageChange("pt")}
+                    className={`border-l border-sky-300 px-2 py-0.5 text-[11px] font-medium ${
+                      language === "pt" ? "bg-sky-600 text-white" : "bg-white text-sky-700 hover:bg-sky-50"
+                    }`}
+                  >
+                    Português
+                  </button>
+                </div>
+              </div>
             )}
           </div>
           <button

@@ -327,3 +327,16 @@ alter table public.leads add constraint leads_status_check check (
     'desqualificado'
   )
 );
+
+-- Idioma da abordagem em WhatsApp, só relevante pro canal "internacional"
+-- (EUA/Canadá, ver WhatsappLanguage em lib/whatsapp-templates.ts): muitos
+-- desses leads são donos de negócio brasileiros morando lá (ex.: planilha
+-- levantada em grupos de brasileiros no Facebook, ver
+-- lib/international-sheet-import.ts), que preferem ser abordados em
+-- português mesmo com o negócio nos EUA/Canadá. Escolhido manualmente no
+-- composer (WhatsAppComposerModal.tsx) ou já preenchido pela planilha de
+-- importação (coluna "idioma"/"language"). "en" é o padrão/comportamento
+-- original; sem efeito pros demais canais (ativo/pago/instagram), sempre em
+-- português.
+alter table public.leads
+  add column if not exists outreach_language text check (outreach_language in ('en', 'pt'));

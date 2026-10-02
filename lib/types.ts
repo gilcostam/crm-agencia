@@ -52,6 +52,13 @@ export interface Lead {
   /** Handle do Instagram do lead, sem "@" (ex.: "nome.sobrenome") — usado na
    * prospecção ativa via Instagram Direct. */
   instagram: string | null;
+  /** Idioma da abordagem em WhatsApp, só relevante pro canal "internacional"
+   * (EUA/Canadá, ver WhatsappLanguage em lib/whatsapp-templates.ts): "en"
+   * (padrão) ou "pt" — útil pra leads de donos de negócio brasileiros
+   * morando lá, que preferem ser abordados no próprio idioma. `null` se
+   * importado antes dessa opção existir (composer trata como "en"). Sem
+   * efeito pros demais canais (ativo/pago/instagram), sempre em português. */
+  outreach_language: "en" | "pt" | null;
   status: LeadStatus;
   /** Data/hora (ISO) em que cada status foi alcançado pela última vez — não
    * inclui "novo_lead" (usar `created_at` pra isso). Preenchido

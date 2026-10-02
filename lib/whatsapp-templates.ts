@@ -130,6 +130,16 @@ const AUTO_WELCOME_SOURCES = new Set(["meta_ads", "trello"]);
 
 export type WhatsappChannel = "ativo" | "pago" | "instagram" | "internacional";
 
+/** Idioma da abordagem, só relevante pro canal "internacional" (EUA/Canadá):
+ * muitos desses leads são donos de negócio brasileiros morando lá (ex.:
+ * planilha levantada em grupos de brasileiros no Facebook, ver
+ * lib/international-sheet-import.ts), que preferem ser abordados em
+ * português mesmo com o negócio nos EUA/Canadá. "en" é o padrão (preserva o
+ * comportamento original da cadência internacional); "pt" usa `textPt` dos
+ * templates abaixo quando disponível (ver `pickTemplateText`). Os demais
+ * canais (ativo/pago/instagram) já são sempre em português, não usam isso. */
+export type WhatsappLanguage = "en" | "pt";
+
 /** Deriva o canal de modelo a partir de `Lead.source`. Leads de prospecção
  * ativa (tng_prospeccao/prospeccao) e cadastros manuais usam o canal "ativo";
  * leads de Meta Ads/Trello usam "pago" (já receberam o aviso automático de
@@ -171,6 +181,13 @@ export interface WhatsappTemplate {
    * condicional sem conteúdo) são descartados automaticamente, ver
    * `renderWhatsappBlocks`. */
   blocks?: string[];
+  /** Versão em português de `text`, só usada pelo canal "internacional"
+   * (ver `WhatsappLanguage`/`pickTemplateText`) — leads de donos de negócio
+   * brasileiros nos EUA/Canadá que preferem ser abordados no próprio idioma.
+   * Ausente em todos os templates dos demais canais (já são sempre em
+   * português) e, por ora, nos modelos "ambos"/não numerados do canal
+   * internacional (boas_vindas/primeira_abordagem não têm variante lá). */
+  textPt?: string;
 }
 
 /** Assinatura opcional ao final da mensagem, some por completo se o
@@ -370,6 +387,58 @@ const INTL_NO_SHOW_TEXT =
 
 const INTL_BREAK_OFF_TEXT =
   `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}since I haven't heard back, I'll take you off our active list so I'm not filling up your phone for nothing. One heads-up: competitors{{#categoria}} in {{categoria}}{{/categoria}} keep gaining ground on Google and AI search while this sits on the back burner. If it becomes a priority, just reach out and we'll pick up right where we left off.`;
+
+/**
+ * Versões em português dos 14 textos acima (ver `WhatsappLanguage`), uma a
+ * uma, pros mesmos 14 templates do canal "internacional" — pro vendedor
+ * poder escolher no composer (ver WhatsAppComposerModal.tsx) quando o lead é
+ * um dono de negócio brasileiro morando nos EUA/Canadá e prefere ser
+ * abordado em português, mesmo o negócio sendo de lá. Mesma estrutura de
+ * seções/placeholders de cada texto em inglês correspondente (pra
+ * `templateUsesVar`/campos extras do composer funcionarem igual nos dois
+ * idiomas), só o texto visível muda.
+ */
+const INTL_PT_ANALISE_TEXT =
+  `Oi{{#primeiro_nome}}, {{primeiro_nome}}{{/primeiro_nome}}!{{#consultor}} Aqui é {{consultor}}, da No Limits Marketing.{{/consultor}}{{^consultor}} Aqui é da No Limits Marketing.{{/consultor}} Fizemos uma checagem rápida e gratuita de como{{#categoria}} o seu negócio de {{categoria}}{{/categoria}}{{^categoria}} o seu negócio{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} aparece no Google, e se ferramentas de busca por IA, tipo o ChatGPT, chegam a te mencionar. Quer que eu te mande o resultado? É grátis, leva uns dois minutos pra ler.`;
+
+const INTL_PT_COBRANCA_TEXT =
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}conseguiu dar uma olhada na checagem gratuita que te mandei? Uma pergunta rápida: hoje seu site e seu perfil no Google realmente trazem cliente novo, ou é mais indicação boca a boca?`;
+
+const INTL_PT_AUTORIDADE_TEXT =
+  `Uma pergunta pra pensar: o que precisaria mudar pra{{#categoria}} o seu negócio de {{categoria}}{{/categoria}}{{^categoria}} você{{/categoria}} virar a primeira opção que as pessoas encontram{{#cidade}} em {{cidade}}{{/cidade}}, no Google e nas buscas por IA, em vez de só mais uma entre várias?`;
+
+const INTL_PT_TICKET_MEDIO_TEXT =
+  `Rapidinho: se cliente novo começasse a te achar direto pelo Google toda semana, além do que você já recebe hoje, quanto isso valeria pro seu faturamento?`;
+
+const INTL_PT_ALERTA_CONCORRENCIA_TEXT =
+  `{{#concorrente}}Hoje é {{concorrente}} quem aparece na sua frente online{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}}.{{/concorrente}}{{^concorrente}}Tem um concorrente com menos experiência que você aparecendo na sua frente online hoje.{{/concorrente}} Na sua opinião, essa diferença tende a aumentar ou diminuir se continuar assim?`;
+
+const INTL_PT_AGENDA_CHEIA_TEXT =
+  `Quanto valeria pra você ter a agenda lotada esse mês? Esse é o tipo de resultado que{{#categoria}} negócios de {{categoria}}{{/categoria}}{{^categoria}} negócios{{/categoria}} costumam ter depois de resolver isso. Quer que eu te mostre como, sem custo?`;
+
+const INTL_PT_PROVA_SOCIAL_TEXT =
+  `Um exemplo rápido: outro cliente nosso{{#categoria}}, também de {{categoria}}{{/categoria}}, quase não aparecia no Google e em poucos meses passou a ranquear na primeira página, além de começar a ser citado por ferramentas de busca com IA. Um resultado assim faria diferença de verdade pra você?`;
+
+const INTL_PT_FECHAMENTO_TEXT =
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}última mensagem, não quero ficar enchendo seu WhatsApp à toa. Resumindo: tem espaço real pra crescer no Google e nas buscas com IA, e os concorrentes já estão ocupando esse espaço. Se virar prioridade, é só chamar, retomamos na hora.`;
+
+const INTL_PT_DIAGNOSTICO_ENVIADO_TEXT =
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}conseguiu ver o relatório completo que te mandei? Posso te explicar tudo ao vivo em 15 minutinhos e mostrar exatamente como aplicar. Qual o melhor horário essa semana?`;
+
+const INTL_PT_REUNIAO_MARCADA_TEXT =
+  `Combinado{{#reuniao}} pra {{reuniao}}{{/reuniao}}! Vou te mostrar o relatório completo ao vivo{{#categoria}} do seu negócio de {{categoria}}{{/categoria}} e exatamente como crescer no Google e nas buscas com IA. Até lá!`;
+
+const INTL_PT_LEMBRETE_REUNIAO_TEXT =
+  `Lembrete rápido: nossa conversa é{{#reuniao}} {{reuniao}}{{/reuniao}}! Vou te mostrar ao vivo onde você está perdendo visibilidade no Google e nas buscas com IA, além de um bônus gratuito só por comparecer. Confirma presença?`;
+
+const INTL_PT_CURIOSIDADE_REUNIAO_TEXT =
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}um aviso rápido antes da nossa conversa{{#reuniao}} de {{reuniao}}{{/reuniao}}: encontrei algo bem específico{{#categoria}} sobre o seu negócio de {{categoria}}{{/categoria}} que quero te mostrar ao vivo, está te custando cliente agora mesmo sem você saber. Vale muito a pena reservar esse horário.`;
+
+const INTL_PT_NO_SHOW_TEXT =
+  `Parece que não nos encontramos{{#reuniao}} em {{reuniao}}{{/reuniao}}{{^reuniao}} no horário combinado{{/reuniao}}, sem problema. Resumindo rápido: {{#categoria}}outros negócios de {{categoria}}{{/categoria}}{{^categoria}}concorrentes{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} estão ganhando espaço no Google enquanto isso fica parado. Quer que eu te mande o resumo agora, ou prefere remarcar?`;
+
+const INTL_PT_BREAK_OFF_TEXT =
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}como não tive retorno, vou tirar seu contato da nossa lista ativa, pra não ficar enchendo seu WhatsApp à toa. Só um alerta: os concorrentes{{#categoria}} de {{categoria}}{{/categoria}} seguem ganhando espaço no Google e nas buscas com IA enquanto isso fica parado. Se virar prioridade, é só chamar que retomamos de onde paramos.`;
 
 /**
  * A cadência completa tem 8 contatos, sempre nessa ordem lógica (ver
@@ -745,6 +814,7 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     appliesTo: ["novo_lead"],
     channel: "internacional",
     text: INTL_ANALISE_TEXT,
+    textPt: INTL_PT_ANALISE_TEXT,
   },
   {
     id: "intl_cobranca",
@@ -753,6 +823,7 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     appliesTo: ["primeiro_contato"],
     channel: "internacional",
     text: INTL_COBRANCA_TEXT,
+    textPt: INTL_PT_COBRANCA_TEXT,
   },
   {
     id: "intl_autoridade",
@@ -761,6 +832,7 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     appliesTo: ["segundo_contato"],
     channel: "internacional",
     text: INTL_AUTORIDADE_TEXT,
+    textPt: INTL_PT_AUTORIDADE_TEXT,
   },
   {
     id: "intl_ticket_medio",
@@ -769,6 +841,7 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     appliesTo: ["terceiro_contato"],
     channel: "internacional",
     text: INTL_TICKET_MEDIO_TEXT,
+    textPt: INTL_PT_TICKET_MEDIO_TEXT,
   },
   {
     id: "intl_alerta_concorrencia",
@@ -777,6 +850,7 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     appliesTo: ["quarto_contato"],
     channel: "internacional",
     text: INTL_ALERTA_CONCORRENCIA_TEXT,
+    textPt: INTL_PT_ALERTA_CONCORRENCIA_TEXT,
   },
   {
     id: "intl_agenda_cheia",
@@ -785,6 +859,7 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     appliesTo: ["quinto_contato"],
     channel: "internacional",
     text: INTL_AGENDA_CHEIA_TEXT,
+    textPt: INTL_PT_AGENDA_CHEIA_TEXT,
   },
   {
     id: "intl_prova_social",
@@ -793,6 +868,7 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     appliesTo: ["sexto_contato"],
     channel: "internacional",
     text: INTL_PROVA_SOCIAL_TEXT,
+    textPt: INTL_PT_PROVA_SOCIAL_TEXT,
   },
   {
     id: "intl_fechamento",
@@ -801,6 +877,7 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     appliesTo: ["setimo_contato"],
     channel: "internacional",
     text: INTL_FECHAMENTO_TEXT,
+    textPt: INTL_PT_FECHAMENTO_TEXT,
   },
   {
     id: "intl_diagnostico_enviado",
@@ -809,6 +886,7 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     appliesTo: ["diagnostico_enviado"],
     channel: "internacional",
     text: INTL_DIAGNOSTICO_ENVIADO_TEXT,
+    textPt: INTL_PT_DIAGNOSTICO_ENVIADO_TEXT,
   },
   {
     id: "intl_reuniao_marcada",
@@ -817,6 +895,7 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     appliesTo: ["reuniao_marcada"],
     channel: "internacional",
     text: INTL_REUNIAO_MARCADA_TEXT,
+    textPt: INTL_PT_REUNIAO_MARCADA_TEXT,
   },
   {
     id: "intl_curiosidade_reuniao",
@@ -826,6 +905,7 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     appliesTo: ["reuniao_marcada"],
     channel: "internacional",
     text: INTL_CURIOSIDADE_REUNIAO_TEXT,
+    textPt: INTL_PT_CURIOSIDADE_REUNIAO_TEXT,
   },
   {
     id: "intl_lembrete_reuniao",
@@ -834,6 +914,7 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     appliesTo: ["reuniao_marcada"],
     channel: "internacional",
     text: INTL_LEMBRETE_REUNIAO_TEXT,
+    textPt: INTL_PT_LEMBRETE_REUNIAO_TEXT,
   },
   {
     id: "intl_no_show",
@@ -842,6 +923,7 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     appliesTo: ["no_show"],
     channel: "internacional",
     text: INTL_NO_SHOW_TEXT,
+    textPt: INTL_PT_NO_SHOW_TEXT,
   },
   {
     id: "intl_break_off",
@@ -850,6 +932,7 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     appliesTo: ["desqualificado"],
     channel: "internacional",
     text: INTL_BREAK_OFF_TEXT,
+    textPt: INTL_PT_BREAK_OFF_TEXT,
   },
 ];
 
@@ -900,6 +983,17 @@ export function defaultTemplateIdForStatus(
 
 export function getTemplate(id: string): WhatsappTemplate {
   return WHATSAPP_TEMPLATES.find((t) => t.id === id) ?? WHATSAPP_TEMPLATES[WHATSAPP_TEMPLATES.length - 1];
+}
+
+/** Escolhe qual texto de um template usar conforme o idioma (ver
+ * `WhatsappLanguage`): "pt" usa `textPt` quando o template tem essa
+ * variante (hoje só os 14 modelos numerados do canal "internacional");
+ * qualquer outro caso (idioma "en", ou template sem `textPt`, ou sem
+ * `language` informado) cai no `text` normal, preservando o comportamento
+ * de sempre pros outros canais (sempre em português) e pro próprio canal
+ * internacional antes dessa opção existir. */
+export function pickTemplateText(template: WhatsappTemplate, language: WhatsappLanguage = "en"): string {
+  return language === "pt" && template.textPt ? template.textPt : template.text;
 }
 
 /** Casa \{\{#campo\}\}...\{\{/campo\}\} (renderiza só se presente) e
@@ -961,13 +1055,19 @@ export function renderWhatsappTemplate(
  * `renderWhatsappTemplate(template.text, vars)`), então o composer pode usar
  * sempre esta função e só mudar a interface quando `blocks.length > 1`.
  * Blocos que renderizam vazios (ex.: seção condicional sem conteúdo, como o
- * bloco de "sem site" quando o lead tem site) são descartados.
+ * bloco de "sem site" quando o lead tem site) são descartados. `language`
+ * (ver `WhatsappLanguage`) só afeta o texto único (sem `blocks`) via
+ * `pickTemplateText`: nenhum template com `blocks` tem variante `textPt`
+ * hoje (só os modelos numerados do canal internacional, que não usam
+ * blocks), mas o parâmetro já cobre esse caso se vier a existir.
  */
 export function renderWhatsappBlocks(
   template: WhatsappTemplate,
-  vars: WhatsappTemplateVars
+  vars: WhatsappTemplateVars,
+  language: WhatsappLanguage = "en"
 ): { blocks: string[]; missing: string[] } {
-  const source = template.blocks && template.blocks.length > 0 ? template.blocks : [template.text];
+  const source =
+    template.blocks && template.blocks.length > 0 ? template.blocks : [pickTemplateText(template, language)];
   const missing = new Set<string>();
   const blocks: string[] = [];
   for (const blockText of source) {

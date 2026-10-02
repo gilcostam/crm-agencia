@@ -34,6 +34,16 @@ export interface InternationalSheetLeadRow {
   status: "novo_lead";
   source: "internacional";
   notes: string;
+  /** Idioma da abordagem em WhatsApp (ver WhatsappLanguage em
+   * lib/whatsapp-templates.ts) — lido de uma coluna "language"/"idioma" na
+   * planilha, quando presente (ver COLUMN_ALIASES.language). `null` quando a
+   * planilha não tem essa coluna, ou o valor não bate com nenhum alias
+   * reconhecido: o composer trata `null` como "en" (comportamento padrão),
+   * mas pode ser trocado manualmente depois, por lead. Útil pra marcar de
+   * uma vez uma planilha inteira de donos de negócio brasileiros nos
+   * EUA/Canadá (ex.: levantada em grupos de brasileiros no Facebook) como
+   * "pt", sem precisar trocar lead por lead no composer. */
+  outreach_language: "en" | "pt" | null;
   raw_payload: {
     _origem: string;
     csv_row: Record<string, string>;
@@ -67,7 +77,21 @@ const COLUMN_ALIASES: Record<string, string[]> = {
   category: ["category", "industry", "niche", "segment", "categoria"],
   city: ["city", "cidade"],
   state: ["state", "province", "estado"],
+  language: ["language", "idioma", "lingua", "idioma de abordagem"],
 };
+
+/** Reconhece valores comuns de "idioma" na planilha (com ou sem acento,
+ * maiúsculo/minúsculo — `normalizeHeader` já cuida disso pro cabeçalho, mas
+ * o VALOR da célula passa por aqui). Qualquer outra coisa (célula vazia,
+ * "N/A", valor digitado errado) vira `null`, nunca um erro: essa coluna é
+ * só um atalho opcional, nunca o único jeito de setar o idioma (dá pra
+ * trocar depois, por lead, no composer). */
+function parseOutreachLanguage(raw: string): "en" | "pt" | null {
+  const value = raw.trim().toLowerCase();
+  if (/^(pt|pt-br|portugues|português|portuguese)$/.test(value)) return "pt";
+  if (/^(en|en-us|ingles|inglês|english)$/.test(value)) return "en";
+  return null;
+}
 
 function pick(record: Record<string, string>, aliases: string[]): string {
   for (const alias of aliases) {
@@ -102,6 +126,7 @@ function buildLeadRow(
   const city = pick(normalized, COLUMN_ALIASES.city);
   const state = pick(normalized, COLUMN_ALIASES.state);
   const cityState = [city, state].filter(Boolean).join(", ");
+  const outreachLanguage = parseOutreachLanguage(pick(normalized, COLUMN_ALIASES.language));
 
   // Precisa de pelo menos um jeito de identificar/contatar o lead: nome,
   // telefone válido (NANP) ou Instagram. Sem nenhum dos três não dá pra
@@ -128,6 +153,7 @@ function buildLeadRow(
     status: "novo_lead",
     source: "internacional",
     notes: "Prospecção ativa EUA/Canadá, lead importado via planilha (upload) pelo dashboard.",
+    outreach_language: outreachLanguage,
     raw_payload: {
       _origem: "Importado via upload de planilha CSV (Prospecção EUA/Canadá > Importar planilha).",
       csv_row: original,
@@ -156,6 +182,7 @@ function dedupeByExternalKey(rows: InternationalSheetLeadRow[]): {
       existing.instagram ||= row.instagram;
       existing.category ||= row.category;
       existing.city ||= row.city;
+      existing.outreach_language ||= row.outreach_language;
       continue;
     }
     seen.set(row.external_key, row);

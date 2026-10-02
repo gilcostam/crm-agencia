@@ -33,6 +33,7 @@ export async function PATCH(
     city,
     category,
     source,
+    outreach_language,
   } = body as {
     status?: string;
     notes?: string;
@@ -42,6 +43,7 @@ export async function PATCH(
     city?: string | null;
     category?: string | null;
     source?: string;
+    outreach_language?: "en" | "pt" | null;
   };
 
   const update: {
@@ -54,6 +56,7 @@ export async function PATCH(
     category?: string | null;
     source?: string;
     status_dates?: Partial<Record<LeadStatus, string>>;
+    outreach_language?: "en" | "pt" | null;
   } = {};
 
   if (status !== undefined) {
@@ -100,6 +103,13 @@ export async function PATCH(
 
   if (city !== undefined) update.city = city?.trim() || null;
   if (category !== undefined) update.category = category?.trim() || null;
+
+  if (outreach_language !== undefined) {
+    if (outreach_language !== null && outreach_language !== "en" && outreach_language !== "pt") {
+      return NextResponse.json({ error: "outreach_language inválido" }, { status: 400 });
+    }
+    update.outreach_language = outreach_language;
+  }
 
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "nada para atualizar" }, { status: 400 });
