@@ -30,6 +30,21 @@ function formatMeetingForMessage(iso: string | null, locale: string = "pt-BR"): 
   });
 }
 
+/** Junta todos os concorrentes encontrados na busca (não só o primeiro) numa
+ * única frase pro campo `concorrente` do template (ex.: "Clínica A (4,8
+ * estrelas, 120 avaliações), Clínica B e Clínica C"), pra toda mensagem que
+ * cita concorrente mostrar o cenário completo pro lead, em vez de um recorte
+ * de um só. Cada nome já carrega sua própria avaliação entre parênteses
+ * (quando existe), por isso o campo `avaliacoes_concorrente` separado fica
+ * sem uso quando essa lista é usada (ver handleSearchCompetitors). */
+function formatCompetitorsForMessage(
+  competitors: Array<{ name: string; ratingText: string | null }>
+): string {
+  const parts = competitors.map((c) => (c.ratingText ? `${c.name} (${c.ratingText})` : c.name));
+  if (parts.length <= 1) return parts.join("");
+  return `${parts.slice(0, -1).join(", ")} e ${parts[parts.length - 1]}`;
+}
+
 /**
  * Composer de mensagem de Instagram Direct — irmão do WhatsAppComposerModal
  * (mesmos modelos, mesma busca de concorrentes, mesmo assistente de envio
@@ -122,26 +137,30 @@ export default function InstagramComposerModal({
       }
 
       const extras: Record<string, string> = {};
-      if (data.topCompetitorName) {
-        extras.concorrente = data.topCompetitorName;
-        extras.avaliacoes_concorrente = data.topCompetitorRatingText ?? "";
-      } else {
-        setCompetitorSearchError("Nenhum concorrente encontrado pra essa categoria/cidade.");
-      }
-
-      if (Array.isArray(data.competitors)) {
-        setCompetitorsFound(
-          data.competitors.map((c: { name: string; rating: number | null; reviewCount: number | null }) => ({
+      const competitorsList: Array<{ name: string; ratingText: string | null }> = Array.isArray(
+        data.competitors
+      )
+        ? data.competitors.map((c: { name: string; rating: number | null; reviewCount: number | null }) => ({
             name: c.name,
             ratingText:
               c.rating != null
                 ? `${c.rating.toFixed(1).replace(".", ",")} estrelas${
-                    c.reviewCount != null ? ` (${c.reviewCount} avaliações)` : ""
+                    c.reviewCount != null ? `, ${c.reviewCount} avaliações` : ""
                   }`
                 : null,
           }))
-        );
+        : [];
+
+      if (competitorsList.length > 0) {
+        // Lista TODOS os concorrentes encontrados na mensagem (não só o
+        // primeiro), mesmo ajuste do WhatsAppComposerModal.
+        extras.concorrente = formatCompetitorsForMessage(competitorsList);
+        extras.avaliacoes_concorrente = "";
+      } else {
+        setCompetitorSearchError("Nenhum concorrente encontrado pra essa categoria/cidade.");
       }
+
+      setCompetitorsFound(competitorsList);
 
       if (data.leadProfile) {
         if (data.leadProfile.hasProfile) {

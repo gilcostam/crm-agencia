@@ -52,10 +52,18 @@ export interface WhatsappTemplateVars {
   /** Nº de avaliações do próprio lead no Google (checado na hora, igual
    * `buscas`). Usado no diagnóstico dos leads de tráfego pago. */
   avaliacoes?: string | null;
-  /** Nome do concorrente líder da categoria/região, usado como comparação no
-   * diagnóstico dos leads de tráfego pago. */
+  /** Concorrente(s) da categoria/região, usado como comparação no
+   * diagnóstico. Quando preenchido pela busca automática (ver
+   * handleSearchCompetitors nos composers), já vem com TODOS os
+   * concorrentes encontrados (até 5), não só o primeiro — cada nome com sua
+   * própria avaliação entre parênteses, juntados numa frase só (ex.:
+   * "Clínica A (4,8 estrelas, 120 avaliações), Clínica B e Clínica C").
+   * Também pode ser digitado à mão com um nome só. */
   concorrente?: string | null;
-  /** Nº de avaliações do concorrente citado em `concorrente`. */
+  /** Nº de avaliações de UM concorrente só, pra quando `concorrente` é
+   * digitado à mão com um nome único. Fica vazio quando `concorrente` vem da
+   * busca automática (a avaliação de cada um já vai embutida ali, já que
+   * pode haver mais de um nome com notas diferentes). */
   avaliacoes_concorrente?: string | null;
   /** Bandeira "sim"/ausente (nunca é exibida como texto) pra alternar o
    * bloco de diagnóstico entre o tom positivo ("já tem perfil, falta só
@@ -220,7 +228,7 @@ const DIAGNOSTICO_IA_BLOCKS: string[] = [
   `Nosso time fez uma análise rápida e gratuita da presença digital d{{#categoria}}o seu negócio de {{categoria}}{{/categoria}}{{^categoria}}o seu negócio{{/categoria}} no Google{{#cidade}} em {{cidade}}{{/cidade}}, incluindo como vocês aparecem quando alguém pergunta pra ferramentas de IA, tipo ChatGPT, antes de escolher{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} um profissional{{/categoria}}.`,
   `{{#tem_perfil}}Boa notícia: vocês já têm perfil no Google{{#avaliacoes}}, com {{avaliacoes}} avaliações{{/avaliacoes}}. Isso já é a base que precisa pra ranquear bem, falta só ajustar alguns pontos de otimização.{{/tem_perfil}}{{^tem_perfil}}Encontramos um ponto de atenção na presença de vocês no Google que vale a pena corrigir o quanto antes.{{/tem_perfil}}`,
   `{{^tem_site}}Também identificamos outro ponto de atenção fora do Google, que impacta diretamente quantas pessoas conseguem encontrar vocês hoje.{{/tem_site}}`,
-  `{{#concorrente}}Hoje quem aparece na frente {{#categoria}}pra "{{categoria}}{{#cidade}} em {{cidade}}{{/cidade}}"{{/categoria}}{{^categoria}}nessa busca{{/categoria}} é {{concorrente}}{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}}. Dá pra disputar essa posição sem depender de anúncio pago.{{/concorrente}}{{^concorrente}}Já mapeamos oportunidades concretas pra vocês passarem à frente de quem hoje aparece primeiro{{#categoria}} em "{{categoria}}{{#cidade}} em {{cidade}}{{/cidade}}"{{/categoria}}, só otimizando o que já existe, sem precisar pagar anúncio.{{/concorrente}}`,
+  `{{#concorrente}}Hoje, quem aparece na frente {{#categoria}}pra "{{categoria}}{{#cidade}} em {{cidade}}{{/cidade}}"{{/categoria}}{{^categoria}}nessa busca{{/categoria}}: {{concorrente}}. Dá pra disputar essa posição sem depender de anúncio pago.{{/concorrente}}{{^concorrente}}Já mapeamos oportunidades concretas pra vocês passarem à frente de quem hoje aparece primeiro{{#categoria}} em "{{categoria}}{{#cidade}} em {{cidade}}{{/cidade}}"{{/categoria}}, só otimizando o que já existe, sem precisar pagar anúncio.{{/concorrente}}`,
   `Separei um horário pra te mostrar tudo isso ao vivo: vou abrir o mapa d{{#cidade}}e {{cidade}}{{/cidade}}{{^cidade}}a sua região{{/cidade}} e te mostrar, na tela, todas as oportunidades que existem hoje e não estão sendo aproveitadas pra vocês aparecerem entre os primeiros no Google, sem precisar pagar anúncio. Posso te mostrar essa semana?`,
 ];
 
@@ -257,7 +265,7 @@ const BREAK_OFF_BLOCKS: string[] = [
 const PRIMEIRA_ABORDAGEM_BLOCKS: string[] = [
   `Olá, é da{{#nome}} {{nome}}{{/nome}}{{^nome}} sua empresa{{/nome}}? {{#tem_perfil}}Vi o perfil de vocês no Google{{#avaliacoes}}, com {{avaliacoes}} avaliações{{/avaliacoes}}, muito bacana o retorno que vocês já têm por lá.{{/tem_perfil}}{{^tem_perfil}}Encontrei vocês numa pesquisa rápida sobre{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} esse tipo de negócio{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}.{{/tem_perfil}}`,
   `Vi também que tem{{#buscas}} {{buscas}}{{/buscas}} pessoas procurando por {{#categoria}}{{categoria}}{{/categoria}}{{^categoria}}esse serviço{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} todos os meses no Google, e hoje isso vai além do Google: muita gente já pergunta direto pra ferramentas de IA, tipo ChatGPT, qual profissional procurar. Você acha que parte desse pessoal pode estar indo pra outro lugar sem nem saber que vocês existem?`,
-  `{{#concorrente}}Hoje, por exemplo, quem aparece na frente {{#categoria}}pra "{{categoria}}{{#cidade}} em {{cidade}}{{/cidade}}"{{/categoria}}{{^categoria}}nessa busca{{/categoria}} é {{concorrente}}{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}}. Quem não aparece bem também não é citado nas respostas que as IAs dão pra quem pergunta isso.{{/concorrente}}{{^concorrente}}Quem não está bem posicionado simplesmente não é citado nessas respostas de IA.{{/concorrente}}`,
+  `{{#concorrente}}Hoje, por exemplo, quem aparece na frente {{#categoria}}pra "{{categoria}}{{#cidade}} em {{cidade}}{{/cidade}}"{{/categoria}}{{^categoria}}nessa busca{{/categoria}}: {{concorrente}}. Quem não aparece bem também não é citado nas respostas que as IAs dão pra quem pergunta isso.{{/concorrente}}{{^concorrente}}Quem não está bem posicionado simplesmente não é citado nessas respostas de IA.{{/concorrente}}`,
   `Preparei uma análise gratuita mostrando esses números reais e o potencial de vocês aparecerem mais nessas buscas e atenderem mais gente. Posso te enviar? Não tem nenhum custo.${SIGNATURE}`,
 ];
 
@@ -289,7 +297,7 @@ const INSTAGRAM_TICKET_MEDIO_TEXT =
   `Uma pergunta rápida: se chegasse gente nova direto pelo Google, sem depender só do alcance do Instagram, isso mudaria seu faturamento do mês?`;
 
 const INSTAGRAM_ALERTA_CONCORRENCIA_TEXT =
-  `{{#concorrente}}Hoje é {{concorrente}} quem aparece na frente no Google, mesmo tendo um Instagram parecido com o de vocês.{{/concorrente}}{{^concorrente}}Tem concorrente com Instagram parecido aparecendo na frente de vocês no Google.{{/concorrente}} Essa diferença tende a aumentar ou diminuir com o tempo, na sua opinião?`;
+  `{{#concorrente}}Hoje quem aparece na frente no Google, mesmo tendo um Instagram parecido com o de vocês: {{concorrente}}.{{/concorrente}}{{^concorrente}}Tem concorrente com Instagram parecido aparecendo na frente de vocês no Google.{{/concorrente}} Essa diferença tende a aumentar ou diminuir com o tempo, na sua opinião?`;
 
 const INSTAGRAM_AGENDA_CHEIA_TEXT =
   `Quanto valeria pra você ter a agenda mais cheia sem depender só do alcance do Instagram? Client{{#categoria}}es de {{categoria}}{{/categoria}} que ajustam isso no Google costumam sentir rápido. Faz sentido eu te mostrar como, sem custo?`;
@@ -359,7 +367,7 @@ const INTL_TICKET_MEDIO_TEXT =
   `Quick one: if new customers started finding you directly through Google every week, on top of what you already get, what would that be worth to your bottom line?`;
 
 const INTL_ALERTA_CONCORRENCIA_TEXT =
-  `{{#concorrente}}Right now {{concorrente}} is showing up ahead of you online{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}}.{{/concorrente}}{{^concorrente}}A competitor with less experience than you is currently showing up ahead of you online.{{/concorrente}} Do you think that gap gets bigger or smaller the longer it's left alone?`;
+  `{{#concorrente}}Right now, here's who's showing up ahead of you online: {{concorrente}}.{{/concorrente}}{{^concorrente}}A competitor with less experience than you is currently showing up ahead of you online.{{/concorrente}} Do you think that gap gets bigger or smaller the longer it's left alone?`;
 
 const INTL_AGENDA_CHEIA_TEXT =
   `What would a fully booked calendar be worth to you this month? That's the kind of result{{#categoria}} {{categoria}} businesses{{/categoria}}{{^categoria}} businesses{{/categoria}} usually see once they fix this. Want me to show you how, no cost?`;
@@ -411,7 +419,7 @@ const INTL_PT_TICKET_MEDIO_TEXT =
   `Rapidinho: se cliente novo começasse a te achar direto pelo Google toda semana, além do que você já recebe hoje, quanto isso valeria pro seu faturamento?`;
 
 const INTL_PT_ALERTA_CONCORRENCIA_TEXT =
-  `{{#concorrente}}Hoje é {{concorrente}} quem aparece na sua frente online{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}}.{{/concorrente}}{{^concorrente}}Tem um concorrente com menos experiência que você aparecendo na sua frente online hoje.{{/concorrente}} Na sua opinião, essa diferença tende a aumentar ou diminuir se continuar assim?`;
+  `{{#concorrente}}Hoje, quem aparece na sua frente online: {{concorrente}}.{{/concorrente}}{{^concorrente}}Tem um concorrente com menos experiência que você aparecendo na sua frente online hoje.{{/concorrente}} Na sua opinião, essa diferença tende a aumentar ou diminuir se continuar assim?`;
 
 const INTL_PT_AGENDA_CHEIA_TEXT =
   `Quanto valeria pra você ter a agenda lotada esse mês? Esse é o tipo de resultado que{{#categoria}} negócios de {{categoria}}{{/categoria}}{{^categoria}} negócios{{/categoria}} costumam ter depois de resolver isso. Quer que eu te mostre como, sem custo?`;
@@ -551,7 +559,7 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
     appliesTo: ["quarto_contato"],
     channel: "ambos",
     text: withSignature(
-      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}vou direto ao ponto: {{#concorrente}}hoje é {{concorrente}}{{#avaliacoes_concorrente}} ({{avaliacoes_concorrente}}){{/avaliacoes_concorrente}} quem aparece{{/concorrente}}{{^concorrente}}tem concorrente com bem menos experiência aparecendo{{/concorrente}} na frente {{#categoria}}quando alguém procura {{categoria}}{{/categoria}}{{^categoria}}nessa busca{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}, tanto no Google quanto nas respostas de ferramentas de IA. Isso já apareceu na análise que te mandei. Na prática, é paciente escolhendo um profissional com menos preparo só porque ele aparece primeiro. O que você acha que acontece com essa diferença se ela continuar assim nos próximos meses, ela tende a diminuir sozinha ou só aumentar?`
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}vou direto ao ponto: {{#concorrente}}hoje, quem aparece na frente é: {{concorrente}}{{/concorrente}}{{^concorrente}}tem concorrente com bem menos experiência aparecendo na frente{{/concorrente}} {{#categoria}}quando alguém procura {{categoria}}{{/categoria}}{{^categoria}}nessa busca{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}, tanto no Google quanto nas respostas de ferramentas de IA. Isso já apareceu na análise que te mandei. Na prática, é paciente escolhendo um profissional com menos preparo só porque ele aparece primeiro. O que você acha que acontece com essa diferença se ela continuar assim nos próximos meses, ela tende a diminuir sozinha ou só aumentar?`
     ),
   },
   {
