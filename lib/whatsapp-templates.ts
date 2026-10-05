@@ -347,7 +347,7 @@ const INSTAGRAM_OBJECAO_SEM_INTERESSE_TEXT =
  *    (DIAGNOSTICO_IA_BLOCKS) do canal "ativo"/"pago".
  */
 const INTL_ANALISE_TEXT =
-  `Hi{{#primeiro_nome}}, {{primeiro_nome}}{{/primeiro_nome}}!{{#consultor}} This is {{consultor}} with No Limits Marketing.{{/consultor}}{{^consultor}} This is No Limits Marketing.{{/consultor}} We ran a quick, free check on how{{#categoria}} your {{categoria}} business{{/categoria}}{{^categoria}} your business{{/categoria}}{{#cidade}} in {{cidade}}{{/cidade}} shows up on Google, and whether AI search tools like ChatGPT even mention you. Want me to send the results? Free, takes two minutes to read.`;
+  `Hi{{#primeiro_nome}}, {{primeiro_nome}}{{/primeiro_nome}}!{{#consultor}} This is {{consultor}} with No Limits Marketing.{{/consultor}}{{^consultor}} This is No Limits Marketing.{{/consultor}} We work with Brazilian entrepreneurs living abroad, and we ran a quick, free check on how{{#categoria}} your {{categoria}} business{{/categoria}}{{^categoria}} your business{{/categoria}}{{#cidade}} in {{cidade}}{{/cidade}} shows up on Google, and whether AI search tools like ChatGPT even mention you. Want me to send the results? Free, takes two minutes to read.`;
 
 const INTL_COBRANCA_TEXT =
   `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}did you get a chance to look at the free check I sent? Quick question: is your website and Google listing actually bringing you new customers right now, or is it mostly word of mouth?`;
@@ -399,7 +399,7 @@ const INTL_BREAK_OFF_TEXT =
  * idiomas), só o texto visível muda.
  */
 const INTL_PT_ANALISE_TEXT =
-  `Oi{{#primeiro_nome}}, {{primeiro_nome}}{{/primeiro_nome}}!{{#consultor}} Aqui é {{consultor}}, da No Limits Marketing.{{/consultor}}{{^consultor}} Aqui é da No Limits Marketing.{{/consultor}} Fizemos uma checagem rápida e gratuita de como{{#categoria}} o seu negócio de {{categoria}}{{/categoria}}{{^categoria}} o seu negócio{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} aparece no Google, e se ferramentas de busca por IA, tipo o ChatGPT, chegam a te mencionar. Quer que eu te mande o resultado? É grátis, leva uns dois minutos pra ler.`;
+  `Oi{{#primeiro_nome}}, {{primeiro_nome}}{{/primeiro_nome}}!{{#consultor}} Aqui é {{consultor}}, da No Limits Marketing.{{/consultor}}{{^consultor}} Aqui é da No Limits Marketing.{{/consultor}} A gente trabalha com brasileiros que empreendem fora do Brasil, e fizemos uma checagem rápida e gratuita de como{{#categoria}} o seu negócio de {{categoria}}{{/categoria}}{{^categoria}} o seu negócio{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} aparece no Google, e se ferramentas de busca por IA, tipo o ChatGPT, chegam a te mencionar. Quer que eu te mande o resultado? É grátis, leva uns dois minutos pra ler.`;
 
 const INTL_PT_COBRANCA_TEXT =
   `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}conseguiu dar uma olhada na checagem gratuita que te mandei? Uma pergunta rápida: hoje seu site e seu perfil no Google realmente trazem cliente novo, ou é mais indicação boca a boca?`;
