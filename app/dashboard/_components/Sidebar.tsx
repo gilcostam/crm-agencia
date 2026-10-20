@@ -7,6 +7,7 @@ import Link from "next/link";
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Leads", icon: LeadsIcon },
   { href: "/dashboard/reunioes", label: "Reuniões Marcadas", icon: MeetingIcon },
+  { href: "/dashboard/remarketing", label: "Remarketing", icon: RemarketingIcon },
   { href: "/dashboard/prospeccao", label: "Prospecção Ativa", icon: ProspeccaoIcon },
   { href: "/dashboard/prospeccao/instagram", label: "Prospecção Instagram", icon: InstagramIcon },
   { href: "/dashboard/prospeccao/internacional", label: "Prospecção EUA/Canadá", icon: GlobeIcon },
@@ -32,6 +33,15 @@ function MeetingIcon() {
       <rect x="2.5" y="3.5" width="15" height="14" rx="1.5" />
       <path d="M2.5 8h15M6 2v3M14 2v3" strokeLinecap="round" />
       <circle cx="10" cy="13" r="2" />
+    </svg>
+  );
+}
+
+function RemarketingIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      <path d="M16.5 10a6.5 6.5 0 0 1-11.2 4.5M3.5 10a6.5 6.5 0 0 1 11.2-4.5" strokeLinecap="round" />
+      <path d="M14.3 5.2h2.4v2.4M5.7 14.8H3.3v-2.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

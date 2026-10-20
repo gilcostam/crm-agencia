@@ -81,6 +81,17 @@ export interface WhatsappTemplateVars {
    * modelos do canal "instagram", pra personalizar o 1º contato com um
    * comentário real sobre o próprio perfil, além dos dados de Google/IA. */
   nota_perfil?: string | null;
+  /** Resultado real e verificado de outro cliente (nome, especialidade,
+   * cidade, o que mudou), digitado à mão pelo vendedor — nunca um número
+   * inventado. Usado só no 2º contato do canal "remarketing" (ver
+   * REMARKETING_PROVA_SOCIAL_TEXT); quando vazio, o template cai numa frase
+   * genérica, sem estatística nenhuma, em vez de inventar um dado. */
+  caso_real?: string | null;
+  /** Link de agendamento (Calendly, Cal.com etc.), digitado à mão pelo
+   * vendedor quando existir um. Usado só no 3º/último contato do canal
+   * "remarketing"; quando vazio, o template troca por "me chama aqui mesmo"
+   * em vez de deixar um link vazio na mensagem. */
+  link_agenda?: string | null;
 }
 
 type VarKey = keyof WhatsappTemplateVars;
@@ -99,6 +110,8 @@ const FIELD_LABELS: Record<VarKey, string> = {
   tem_perfil: "se o lead tem perfil no Google",
   tem_site: "se o lead tem site",
   nota_perfil: "observação sobre o perfil do Instagram",
+  caso_real: "caso de sucesso real (resultado verificado)",
+  link_agenda: "link de agendamento (opcional)",
 };
 
 /** Vars usadas só como bandeira de presença/ausência (`tem_perfil`,
@@ -123,6 +136,8 @@ export const EDITABLE_EXTRA_KEYS: VarKey[] = [
   "concorrente",
   "avaliacoes_concorrente",
   "nota_perfil",
+  "caso_real",
+  "link_agenda",
 ];
 
 /** Testa se um template usa determinado placeholder (simples ou em seção),
@@ -136,7 +151,7 @@ export function templateUsesVar(templateText: string, key: VarKey): boolean {
  * os `trigger`s "auto_meta_ads"/"auto_trello" de lib/whatsapp-automation.ts. */
 const AUTO_WELCOME_SOURCES = new Set(["meta_ads", "trello"]);
 
-export type WhatsappChannel = "ativo" | "pago" | "instagram" | "internacional";
+export type WhatsappChannel = "ativo" | "pago" | "instagram" | "internacional" | "remarketing";
 
 /** Idioma da abordagem, só relevante pro canal "internacional" (EUA/Canadá):
  * muitos desses leads são donos de negócio brasileiros morando lá (ex.:
@@ -447,6 +462,55 @@ const INTL_PT_NO_SHOW_TEXT =
 
 const INTL_PT_BREAK_OFF_TEXT =
   `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}como não tive retorno, vou tirar seu contato da nossa lista ativa, pra não ficar enchendo seu WhatsApp à toa. Só um alerta: os concorrentes{{#categoria}} de {{categoria}}{{/categoria}} seguem ganhando espaço no Google e nas buscas com IA enquanto isso fica parado. Se virar prioridade, é só chamar que retomamos de onde paramos.`;
+
+/**
+ * Cadência de remarketing pro canal "remarketing" (leads com `status:
+ * "finalizado"`, ver app/dashboard/remarketing — página exclusiva pra esses
+ * leads, independente do `source`/canal original). 3 contatos só, de baixa
+ * pressão, reaquecendo um lead que passou pelo funil mas não fechou há um
+ * tempo. Mesmo cuidado do resto do arquivo: nenhum número inventado — a
+ * prova social (2º contato) usa `caso_real`, digitado à mão pelo vendedor com
+ * um resultado de verdade, e cai numa frase genérica (sem estatística) se
+ * ficar vazio, em vez de inventar um dado. Técnicas usadas:
+ *  - 1º contato: reabre o diálogo citando o tempo que passou (reconhece a
+ *    pausa em vez de fingir que é a primeira mensagem) e reintroduz a
+ *    identidade de quem manda (igual ao padrão already usado no canal
+ *    "internacional", `{{consultor}}` condicional), com proposta de valor
+ *    direta (Google + buscas por IA, sem anúncio pago) e CTA de baixo
+ *    compromisso (10 minutos).
+ *  - 2º contato: prova social concreta (`caso_real`) em vez de alegação
+ *    genérica, reforçando que o resultado vem de aparecer como referência,
+ *    não de anúncio pago.
+ *  - 3º contato: fechamento tipo "takeaway" (Jim Camp/Chris Voss) — avisa que
+ *    é a última mensagem, nomeia a perda real (concorrentes ocupando espaço)
+ *    sem inventar prazo/urgência artificial, e oferece uma saída explícita
+ *    ("se não for o momento, só avisa e paro por aqui"), o que tende a gerar
+ *    mais resposta do que pressão crescente, por reduzir a reatância do lead.
+ */
+const REMARKETING_REAQUECIMENTO_TEXT =
+  `{{#primeiro_nome}}Oi, {{primeiro_nome}}!{{/primeiro_nome}}{{^primeiro_nome}}Oi, tudo bem?{{/primeiro_nome}}{{#consultor}} Aqui é {{consultor}}, da No Limits Marketing.{{/consultor}}{{^consultor}} Aqui é da No Limits Marketing.{{/consultor}} Faz um tempo que você passou pelo nosso formulário, e essa semana lembrei de você.
+
+A gente ajuda{{#categoria}} negócios de {{categoria}}{{/categoria}}{{^categoria}} negócios{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} a aparecer como referência no Google e nas respostas que as ferramentas de IA dão (tipo ChatGPT), sem depender de anúncio pago.
+
+Faz sentido eu separar 10 minutos essa semana pra te mostrar o que mudou desde então?`;
+
+const REMARKETING_PROVA_SOCIAL_TEXT =
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}voltando aqui rapidinho com uma prova de que isso funciona na prática:
+
+{{#caso_real}}{{caso_real}}{{/caso_real}}{{^caso_real}}Um negócio parecido com o seu virou referência nas buscas por IA e no Google em poucas semanas, sem pagar um real de anúncio.{{/caso_real}}
+
+Esse tipo de resultado vem de aparecer como referência quando o cliente pesquisa antes de decidir onde ir, não de anúncio pago.
+
+Quer entender como isso ficaria aplicado{{#categoria}} no seu negócio de {{categoria}}{{/categoria}}{{^categoria}} no seu negócio{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}?`;
+
+const REMARKETING_ULTIMO_CONTATO_TEXT =
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}essa é a última mensagem que te mando sobre isso, não quero encher seu WhatsApp à toa.
+
+Enquanto isso fica parado,{{#categoria}} outros negócios de {{categoria}}{{/categoria}}{{^categoria}} outros concorrentes{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} seguem ocupando esse espaço no Google e nas buscas por IA.
+
+Se ainda fizer sentido pra você,{{#link_agenda}} separei esse link pra marcarmos 15 minutos: {{link_agenda}}{{/link_agenda}}{{^link_agenda}} me chama aqui mesmo que a gente marca 15 minutos.{{/link_agenda}}
+
+Se não for o momento, sem problema nenhum, só me avisa e eu paro por aqui.`;
 
 /**
  * A cadência completa tem 8 contatos, sempre nessa ordem lógica (ver
@@ -942,17 +1006,52 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     text: INTL_BREAK_OFF_TEXT,
     textPt: INTL_PT_BREAK_OFF_TEXT,
   },
+
+  // ---- Canal "remarketing": só visível na página /dashboard/remarketing,
+  // nunca aparece nos outros composers (ver whatsappChannelForSource e o
+  // override por status em WhatsAppComposerModal.tsx) ----
+  {
+    id: "remarketing_reaquecimento",
+    label: "1º contato: Reaquecimento",
+    description:
+      "1º contato da sequência de remarketing: reabre o diálogo reconhecendo o tempo que passou, reintroduz quem está mandando a mensagem e convida pra 10 minutos, sem cobrar nada do passado.",
+    appliesTo: ["finalizado"],
+    channel: "remarketing",
+    text: withSignature(REMARKETING_REAQUECIMENTO_TEXT),
+  },
+  {
+    id: "remarketing_prova_social",
+    label: "2º contato: Prova social (caso real)",
+    description:
+      "2º contato: mostra um resultado real e verificado (preencha 'caso de sucesso real' com um exemplo de verdade — sem preencher, a mensagem usa uma frase genérica, nunca um número inventado).",
+    appliesTo: ["finalizado"],
+    channel: "remarketing",
+    text: REMARKETING_PROVA_SOCIAL_TEXT,
+  },
+  {
+    id: "remarketing_ultimo_contato",
+    label: "3º contato: Último contato (takeaway)",
+    description:
+      "3º e último contato da sequência: avisa que não manda mais mensagem sobre isso, nomeia a perda real (concorrentes ocupando espaço) e oferece uma saída explícita, pra reduzir resistência em vez de pressionar.",
+    appliesTo: ["finalizado"],
+    channel: "remarketing",
+    text: REMARKETING_ULTIMO_CONTATO_TEXT,
+  },
 ];
 
 /** Modelos visíveis pra um canal específico, na ordem em que devem aparecer
  * no seletor do composer (ativos/pagos primeiro, compartilhados por último).
- * Os canais "instagram" e "internacional" são tratados à parte, sem herdar
- * os modelos "ambos" (esses são os textos longos de WhatsApp em português):
- * cada um tem sua própria cadência curta, dedicada, e sempre inclui
- * "personalizada" (mensagem em branco), único modelo "ambos" que continua
- * fazendo sentido pra qualquer canal. */
+ * Os canais "instagram", "internacional" e "remarketing" são tratados à
+ * parte, sem herdar os modelos "ambos" (esses são os textos longos de
+ * WhatsApp em português): cada um tem sua própria cadência curta, dedicada, e
+ * sempre inclui "personalizada" (mensagem em branco), único modelo "ambos"
+ * que continua fazendo sentido pra qualquer canal. O canal "remarketing" só é
+ * escolhido pelo composer quando `lead.status === "finalizado"` (ver
+ * WhatsAppComposerModal.tsx), então esses 3 modelos nunca aparecem nos
+ * outros composers/páginas, só na janela dedicada
+ * (app/dashboard/remarketing). */
 export function getTemplatesForChannel(channel: WhatsappChannel): WhatsappTemplate[] {
-  if (channel === "instagram" || channel === "internacional") {
+  if (channel === "instagram" || channel === "internacional" || channel === "remarketing") {
     // "personalizada" está definida antes dessas seções no array (é
     // compartilhada com os outros canais), então isolar e reanexar ao final
     // evita que "Mensagem em branco" apareça como 1ª opção no seletor.

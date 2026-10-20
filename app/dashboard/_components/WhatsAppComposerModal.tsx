@@ -70,7 +70,15 @@ export default function WhatsAppComposerModal({
   onClose: () => void;
   onLogged?: () => void;
 }) {
-  const channel = useMemo(() => whatsappChannelForSource(lead.source), [lead.source]);
+  // Leads com status "finalizado" usam o canal "remarketing" (3 modelos de
+  // baixa pressão, ver lib/whatsapp-templates.ts), independente de qual era o
+  // canal original (source) do lead — a página dedicada
+  // (app/dashboard/remarketing) é a única que abre o composer pra esses
+  // leads, então não precisa de uma prop à parte pra isso.
+  const channel = useMemo(
+    () => (lead.status === "finalizado" ? "remarketing" : whatsappChannelForSource(lead.source)),
+    [lead.source, lead.status]
+  );
   // Leads "internacional" (EUA/Canadá) usam NANP (código de país "1" + 10
   // dígitos), incompatível com `sanitizePhone` (só Brasil, ver
   // lib/international-phone.ts pro motivo de ser um módulo à parte).
@@ -166,7 +174,15 @@ export default function WhatsAppComposerModal({
       const res = await fetch(`/api/leads/${lead.id}/competitors`);
       const data = await res.json();
       if (!res.ok) {
-        setCompetitorSearchError(data.error ?? "Não foi possível buscar concorrentes.");
+        // res.status 401 é a sessão (cookie, 12h de validade — ver
+        // SESSION_TTL_MS em lib/auth.ts) vencida, não um problema na busca em
+        // si; sem esse tratamento, o vendedor via o JSON cru ("unauthorized")
+        // aparecer sob o botão, sem entender o que aconteceu.
+        setCompetitorSearchError(
+          res.status === 401
+            ? "Sua sessão expirou. Atualize a página (F5) e faça login de novo."
+            : (data.error ?? "Não foi possível buscar concorrentes.")
+        );
         return;
       }
 

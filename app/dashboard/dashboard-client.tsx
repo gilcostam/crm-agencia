@@ -22,6 +22,17 @@ import { defaultTemplateIdForStatus, getTemplate, whatsappChannelForSource } fro
 import WhatsAppComposerModal from "./_components/WhatsAppComposerModal";
 import InstagramComposerModal from "./_components/InstagramComposerModal";
 
+/** STATUS_ORDER sem "finalizado": usado só nas colunas do Kanban (ver
+ * `groupByOldestFirst` mais abaixo). Leads finalizados saem de todas as
+ * janelas do Kanban (tráfego pago, prospecção ativa, Instagram,
+ * internacional) e passam a viver só na janela dedicada
+ * (app/dashboard/remarketing), evitando confundir com os leads ainda ativos
+ * — pedido explícito ao implementar a sequência de remarketing. O status
+ * "finalizado" continua uma opção normal nos seletores de status (o lead
+ * entra nessa janela justamente ao ser marcado assim), só não vira mais uma
+ * coluna própria no board. */
+const BOARD_STATUS_ORDER: LeadStatus[] = STATUS_ORDER.filter((s) => s !== "finalizado");
+
 /** Rótulo da próxima mensagem a enviar pro lead, pra deixar visível no card
  * do Kanban (ver lib/whatsapp-templates.ts pra o desenho completo da
  * cadência de 8 contatos). Usa o mesmo cálculo do composer
@@ -39,11 +50,13 @@ import InstagramComposerModal from "./_components/InstagramComposerModal";
  * faz sentido sugerir uma mensagem fixa. */
 function nextMessageLabelForLead(lead: Lead): string | null {
   const channel =
-    lead.source === "internacional"
-      ? whatsappChannelForSource(lead.source)
-      : lead.instagram
-        ? "instagram"
-        : whatsappChannelForSource(lead.source);
+    lead.status === "finalizado"
+      ? "remarketing"
+      : lead.source === "internacional"
+        ? whatsappChannelForSource(lead.source)
+        : lead.instagram
+          ? "instagram"
+          : whatsappChannelForSource(lead.source);
   const templateId = defaultTemplateIdForStatus(lead.status, channel, lead.meeting_datetime);
   if (templateId === "personalizada") return null;
   return getTemplate(templateId).label;
@@ -1109,6 +1122,7 @@ export default function DashboardClient({
   enableSendToProspecting = false,
   defaultLeadSource,
   groupByMeetingUrgency = false,
+  groupByOldestFirst = false,
 }: {
   initialLeads: Lead[];
   /** Título exibido no cabeçalho da página (ex.: "Prospecção Ativa" na tela
@@ -1155,6 +1169,14 @@ export default function DashboardClient({
    * `status: "reuniao_marcada"`, então colunas por status não separariam
    * nada; colunas por urgência é que mostram quem precisa de atenção agora. */
   groupByMeetingUrgency?: boolean;
+  /** Troca o agrupamento em colunas por uma lista única, sem colunas por
+   * status, ordenada do lead mais antigo (created_at) pro mais novo — usado
+   * só na janela de "Remarketing" (app/dashboard/remarketing/page.tsx), onde
+   * todo lead já está em `status: "finalizado"` (ver BOARD_STATUS_ORDER, que
+   * nem renderiza coluna pra esse status nas outras janelas). Tem prioridade
+   * sobre groupByMeetingUrgency, mas as duas nunca são usadas juntas na
+   * prática (cada janela liga só uma). */
+  groupByOldestFirst?: boolean;
 }) {
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -2356,7 +2378,34 @@ export default function DashboardClient({
                   </div>
                 );
               })
-            : STATUS_ORDER.map((status) => {
+            : groupByOldestFirst
+            ? (() => {
+                const columnLeads = filteredLeads
+                  .slice()
+                  .sort(
+                    (a, b) =>
+                      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                  );
+                return (
+                  <div className="w-72 shrink-0 rounded-lg bg-white p-3 shadow-sm">
+                    <div className="mb-3 flex items-center justify-between px-1">
+                      <h2 className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+                        Mais antigo primeiro
+                      </h2>
+                      <span className="text-xs text-neutral-400">{columnLeads.length}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {columnLeads.length === 0 && (
+                        <p className="px-1 py-6 text-center text-xs text-neutral-400">
+                          Sem leads
+                        </p>
+                      )}
+                      {columnLeads.map((lead) => renderLeadCard(lead))}
+                    </div>
+                  </div>
+                );
+              })()
+            : BOARD_STATUS_ORDER.map((status) => {
                 const columnLeads = filteredLeads.filter((l) => l.status === status);
                 return (
                   <div
