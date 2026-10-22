@@ -11,11 +11,15 @@ import DashboardClient from "../dashboard-client";
  * `status` (em vez de `source`) usado em app/dashboard/reunioes/page.tsx.
  * Um lead marcado como "finalizado" some de todas as colunas do Kanban
  * principal (ver BOARD_STATUS_ORDER em dashboard-client.tsx) e passa a viver
- * só aqui, ordenado do mais antigo pro mais novo (`groupByOldestFirst`), pra
- * priorizar quem está esfriando há mais tempo na fila de remarketing. O
- * composer de WhatsApp detecta `lead.status === "finalizado"` e troca pro
- * canal "remarketing" automaticamente (ver WhatsAppComposerModal.tsx), que
- * só existe nessa janela: 3 mensagens de reaquecimento de baixa pressão (ver
+ * só aqui, organizado em colunas por etapa da sequência de remarketing
+ * (`groupByRemarketingStage`: nenhuma mensagem / 1ª / 2ª / 3ª) — dá pra
+ * arrastar o card pra coluna seguinte conforme manda cada mensagem na mão,
+ * igual ao Kanban principal, só que por etapa em vez de status. Dentro de
+ * cada coluna os leads ficam do mais antigo pro mais novo, pra priorizar
+ * quem está esfriando há mais tempo. O composer de WhatsApp detecta
+ * `lead.status === "finalizado"` e troca pro canal "remarketing"
+ * automaticamente (ver WhatsAppComposerModal.tsx), que só existe nessa
+ * janela: 3 mensagens de reaquecimento de baixa pressão (ver
  * lib/whatsapp-templates.ts). */
 export default async function RemarketingPage() {
   const cookieStore = await cookies();
@@ -38,7 +42,7 @@ export default async function RemarketingPage() {
       initialLeads={(data as Lead[]) ?? []}
       title="Remarketing"
       pollQuery="status=finalizado"
-      groupByOldestFirst
+      groupByRemarketingStage
     />
   );
 }

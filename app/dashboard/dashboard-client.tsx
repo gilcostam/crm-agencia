@@ -26,7 +26,7 @@ import WhatsAppComposerModal from "./_components/WhatsAppComposerModal";
 import InstagramComposerModal from "./_components/InstagramComposerModal";
 
 /** STATUS_ORDER sem "finalizado": usado só nas colunas do Kanban (ver
- * `groupByOldestFirst` mais abaixo). Leads finalizados saem de todas as
+ * `groupByRemarketingStage` mais abaixo). Leads finalizados saem de todas as
  * janelas do Kanban (tráfego pago, prospecção ativa, Instagram,
  * internacional) e passam a viver só na janela dedicada
  * (app/dashboard/remarketing), evitando confundir com os leads ainda ativos
@@ -35,6 +35,19 @@ import InstagramComposerModal from "./_components/InstagramComposerModal";
  * entra nessa janela justamente ao ser marcado assim), só não vira mais uma
  * coluna própria no board. */
 const BOARD_STATUS_ORDER: LeadStatus[] = STATUS_ORDER.filter((s) => s !== "finalizado");
+
+/** Chave de coluna usada no board da janela de Remarketing: "none" é a
+ * coluna de quem ainda não recebeu nenhuma mensagem da sequência (lead com
+ * `remarketing_stage: null`), as outras 3 espelham RemarketingStage. Mantido
+ * separado de RemarketingStage (que não tem "sem etapa") porque a coluna
+ * "nenhuma mensagem enviada" precisa de uma chave própria pra onDrop/
+ * onDragOver (ver `groupByRemarketingStage` mais abaixo). */
+type RemarketingStageColumnKey = RemarketingStage | "none";
+
+const REMARKETING_STAGE_COLUMNS: { key: RemarketingStageColumnKey; label: string }[] = [
+  { key: "none", label: "Nenhuma mensagem enviada" },
+  ...REMARKETING_STAGE_ORDER.map((stage) => ({ key: stage, label: REMARKETING_STAGE_LABELS[stage] })),
+];
 
 /** Rótulo da próxima mensagem a enviar pro lead, pra deixar visível no card
  * do Kanban (ver lib/whatsapp-templates.ts pra o desenho completo da
@@ -1125,7 +1138,7 @@ export default function DashboardClient({
   enableSendToProspecting = false,
   defaultLeadSource,
   groupByMeetingUrgency = false,
-  groupByOldestFirst = false,
+  groupByRemarketingStage = false,
 }: {
   initialLeads: Lead[];
   /** Título exibido no cabeçalho da página (ex.: "Prospecção Ativa" na tela
@@ -1172,14 +1185,19 @@ export default function DashboardClient({
    * `status: "reuniao_marcada"`, então colunas por status não separariam
    * nada; colunas por urgência é que mostram quem precisa de atenção agora. */
   groupByMeetingUrgency?: boolean;
-  /** Troca o agrupamento em colunas por uma lista única, sem colunas por
-   * status, ordenada do lead mais antigo (created_at) pro mais novo — usado
-   * só na janela de "Remarketing" (app/dashboard/remarketing/page.tsx), onde
-   * todo lead já está em `status: "finalizado"` (ver BOARD_STATUS_ORDER, que
-   * nem renderiza coluna pra esse status nas outras janelas). Tem prioridade
-   * sobre groupByMeetingUrgency, mas as duas nunca são usadas juntas na
-   * prática (cada janela liga só uma). */
-  groupByOldestFirst?: boolean;
+  /** Troca o agrupamento em colunas de "por status" (STATUS_ORDER, o padrão)
+   * pra "por etapa de remarketing" (REMARKETING_STAGE_COLUMNS: nenhuma
+   * mensagem / 1ª / 2ª / 3ª) — usado só na janela de "Remarketing"
+   * (app/dashboard/remarketing/page.tsx), onde todo lead já está em
+   * `status: "finalizado"` (ver BOARD_STATUS_ORDER, que nem renderiza coluna
+   * pra esse status nas outras janelas), então colunas por status não
+   * separariam nada; colunas por etapa é que deixam arrastar o card conforme
+   * cada mensagem da sequência é enviada manualmente. Dentro de cada coluna
+   * os cards ficam ordenados do mais antigo (created_at) pro mais novo, pra
+   * priorizar quem está esfriando há mais tempo. Tem prioridade sobre
+   * groupByMeetingUrgency, mas as duas nunca são usadas juntas na prática
+   * (cada janela liga só uma). */
+  groupByRemarketingStage?: boolean;
 }) {
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -1194,6 +1212,8 @@ export default function DashboardClient({
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [dragOverStatus, setDragOverStatus] = useState<LeadStatus | null>(null);
+  const [dragOverRemarketingStage, setDragOverRemarketingStage] =
+    useState<RemarketingStageColumnKey | null>(null);
   const [showNewLeadModal, setShowNewLeadModal] = useState(false);
   const [conversionNotice, setConversionNotice] = useState<{ leadName: string } | null>(null);
   const [importingTng, setImportingTng] = useState(false);
@@ -2419,19 +2439,41 @@ export default function DashboardClient({
                   </div>
                 );
               })
-            : groupByOldestFirst
-            ? (() => {
+            : groupByRemarketingStage
+            ? REMARKETING_STAGE_COLUMNS.map(({ key, label }) => {
                 const columnLeads = filteredLeads
+                  .filter((l) => (l.remarketing_stage ?? "none") === key)
                   .slice()
                   .sort(
                     (a, b) =>
                       new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
                   );
                 return (
-                  <div className="w-72 shrink-0 rounded-lg bg-white p-3 shadow-sm">
+                  <div
+                    key={key}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      setDragOverRemarketingStage(key);
+                    }}
+                    onDragLeave={() =>
+                      setDragOverRemarketingStage((s) => (s === key ? null : s))
+                    }
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const leadId = e.dataTransfer.getData("text/plain");
+                      if (leadId) {
+                        updateRemarketingStage(leadId, key === "none" ? null : key);
+                      }
+                      setDragOverRemarketingStage(null);
+                    }}
+                    className={`w-72 shrink-0 rounded-lg bg-white p-3 shadow-sm transition ${
+                      dragOverRemarketingStage === key ? "ring-2 ring-neutral-900" : ""
+                    }`}
+                  >
                     <div className="mb-3 flex items-center justify-between px-1">
                       <h2 className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-                        Mais antigo primeiro
+                        {label}
                       </h2>
                       <span className="text-xs text-neutral-400">{columnLeads.length}</span>
                     </div>
@@ -2445,7 +2487,7 @@ export default function DashboardClient({
                     </div>
                   </div>
                 );
-              })()
+              })
             : BOARD_STATUS_ORDER.map((status) => {
                 const columnLeads = filteredLeads.filter((l) => l.status === status);
                 return (
