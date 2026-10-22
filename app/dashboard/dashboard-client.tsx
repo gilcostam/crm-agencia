@@ -11,6 +11,9 @@ import {
   LeadStatus,
   MEETING_URGENCY_LABELS,
   MeetingUrgency,
+  REMARKETING_STAGE_LABELS,
+  REMARKETING_STAGE_ORDER,
+  RemarketingStage,
   STATUS_LABELS,
   STATUS_ORDER,
   followupUrgency,
@@ -1510,6 +1513,22 @@ export default function DashboardClient({
     refresh();
   }
 
+  /** Marca manualmente em qual mensagem da sequência de remarketing (ver
+   * channel "remarketing" em lib/whatsapp-templates.ts) o lead está —
+   * nunca avançado automaticamente ao enviar uma mensagem, só quando a
+   * vendedora troca no seletor do card (ela quer controlar isso na mão). */
+  async function updateRemarketingStage(id: string, stage: RemarketingStage | null) {
+    setLeads((prev) =>
+      prev.map((l) => (l.id === id ? { ...l, remarketing_stage: stage } : l))
+    );
+    await fetch(`/api/leads/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ remarketing_stage: stage }),
+    });
+    refresh();
+  }
+
   /** Move um lead de tráfego pago/Trello (tela de "Leads") pra prospecção
    * ativa, mudando seu `source` pra "prospeccao" (ver whitelist em
    * app/api/leads/[id]/route.ts). Remove o lead da lista local na hora —
@@ -1969,6 +1988,28 @@ export default function DashboardClient({
             </option>
           ))}
         </select>
+
+        {lead.status === "finalizado" && (
+          <select
+            value={lead.remarketing_stage ?? ""}
+            onClick={(e) => e.stopPropagation()}
+            onChange={(e) =>
+              updateRemarketingStage(
+                lead.id,
+                e.target.value === "" ? null : (e.target.value as RemarketingStage)
+              )
+            }
+            title="Em qual mensagem da sequência de remarketing este lead está"
+            className="mt-1 w-full rounded border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-700"
+          >
+            <option value="">Remarketing: nenhuma mensagem enviada</option>
+            {REMARKETING_STAGE_ORDER.map((s) => (
+              <option key={s} value={s}>
+                Remarketing: {REMARKETING_STAGE_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
     );
   }

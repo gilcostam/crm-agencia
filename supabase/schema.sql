@@ -340,3 +340,14 @@ alter table public.leads add constraint leads_status_check check (
 -- português.
 alter table public.leads
   add column if not exists outreach_language text check (outreach_language in ('en', 'pt'));
+
+-- Em qual das 3 mensagens da sequência de remarketing o lead está (ver canal
+-- "remarketing" em lib/whatsapp-templates.ts e
+-- app/dashboard/remarketing/page.tsx) — só relevante pra leads com
+-- status='finalizado'. Alterado manualmente pelo vendedor direto no card
+-- (ver seletor em app/dashboard/dashboard-client.tsx), não avança sozinho ao
+-- enviar uma mensagem. `null` = nenhuma mensagem de remarketing enviada
+-- ainda.
+alter table public.leads
+  add column if not exists remarketing_stage text
+    check (remarketing_stage in ('mensagem_1', 'mensagem_2', 'mensagem_3'));

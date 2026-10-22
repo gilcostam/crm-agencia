@@ -1,4 +1,4 @@
-import { LeadStatus, meetingUrgency } from "./types";
+import { LeadStatus, meetingUrgency, RemarketingStage } from "./types";
 
 /**
  * Modelos de mensagem de WhatsApp usados pelo composer manual (ver
@@ -1075,7 +1075,8 @@ export function getTemplatesForChannel(channel: WhatsappChannel): WhatsappTempla
 export function defaultTemplateIdForStatus(
   status: LeadStatus,
   channel: WhatsappChannel,
-  meetingDatetime?: string | null
+  meetingDatetime?: string | null,
+  remarketingStage?: RemarketingStage | null
 ): string {
   const templates = getTemplatesForChannel(channel);
   const matches = templates.filter((t) => t.appliesTo.includes(status));
@@ -1084,6 +1085,17 @@ export function defaultTemplateIdForStatus(
     const urgency = meetingUrgency(meetingDatetime ?? null);
     if (urgency === "proxima") return matches[1].id;
     if (urgency === "iminente" || urgency === "atrasada") return matches[matches.length - 1].id;
+  }
+  // Canal "remarketing": os 3 modelos (ver REMARKETING_*_TEXT acima) têm a
+  // mesma ordem de REMARKETING_STAGE_ORDER (lib/types.ts) — `remarketingStage`
+  // é a ÚLTIMA mensagem já enviada, então o default é sempre a PRÓXIMA da
+  // sequência. Depois da 3ª (última), não sobra modelo novo: cai pra
+  // "personalizada" em vez de repetir a última.
+  if (channel === "remarketing" && matches.length > 1) {
+    if (!remarketingStage) return matches[0].id;
+    if (remarketingStage === "mensagem_1") return matches[1]?.id ?? "personalizada";
+    if (remarketingStage === "mensagem_2") return matches[2]?.id ?? "personalizada";
+    return "personalizada";
   }
   return matches[0].id;
 }
@@ -1185,14 +1197,137 @@ export function renderWhatsappBlocks(
   return { blocks, missing: Array.from(missing) };
 }
 
+/** Categorias (texto livre em `lead.category`) em que "Dr./Dra." é o
+ * tratamento natural no Brasil — profissões liberais/de nível superior,
+ * majoritariamente saúde (reflete a base de clientes da agência: dentistas,
+ * ortopedistas, etc. — ver MEMORY.md). Fora dessas, o nome aparece sem
+ * título (dono de loja, posto, restaurante etc.), pra não soar forçado.
+ * Comparação por "contém", já sem acento/caixa (ver `normalizeForMatch`),
+ * pra pegar variações como "clínica odontológica", "cirurgiã dentista",
+ * "médica ginecologista". Lista curta e editável, não pretende ser
+ * exaustiva — categoria que não bate aqui simplesmente fica sem título
+ * automático (a vendedora sempre pode forçar "Dr."/"Dra." manualmente no
+ * composer, ver `titulo_override`). */
+const TITLE_ELIGIBLE_CATEGORY_KEYWORDS = [
+  "medic",
+  "clinic",
+  "dentist",
+  "odont",
+  "ortodont",
+  "ortoped",
+  "fisioterap",
+  "psicolog",
+  "psiquiatr",
+  "nutricion",
+  "veterinari",
+  "advogad",
+  "advocacia",
+  "engenheir",
+  "arquitet",
+  "cirurgi",
+  "dermatolog",
+  "cardiolog",
+  "pediatr",
+  "ginecolog",
+  "oftalmolog",
+  "fonoaudiolog",
+  "contab",
+] as const;
+
+function normalizeForMatch(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase();
+}
+
+function isTitleEligibleCategory(category: string | null): boolean {
+  if (!category) return false;
+  const normalized = normalizeForMatch(category);
+  return TITLE_ELIGIBLE_CATEGORY_KEYWORDS.some((kw) => normalized.includes(kw));
+}
+
+/** Primeiros nomes femininos comuns no Brasil que NÃO terminam em "a" — a
+ * heurística abaixo (último caractere) erraria esses. Não é exaustivo, só os
+ * casos comuns o bastante pra valer a pena corrigir aqui; qualquer erro
+ * restante fica visível no preview da mensagem antes de enviar, e dá pra
+ * corrigir na hora com `titulo_override` no composer. */
+const FEMALE_FIRST_NAME_EXCEPTIONS = new Set([
+  "beatriz",
+  "ines",
+  "raquel",
+  "isabel",
+  "ester",
+  "esther",
+  "miriam",
+  "noemi",
+  "jaqueline",
+  "carmen",
+  "jade",
+  "alice",
+  "iris",
+  "rebeca",
+  "elizabete",
+  "elisabete",
+  "rute",
+  "ruth",
+  "nicole",
+  "yasmin",
+  "jasmin",
+]);
+
+/** Primeiros nomes masculinos comuns que terminam em "a" — idem, exceção à
+ * heurística do último caractere. */
+const MALE_FIRST_NAME_EXCEPTIONS = new Set(["luca"]);
+
+/** Chute de gênero a partir do primeiro nome, só pra decidir "Dr." x "Dra."
+ * — heurística (nomes terminados em "a" tendem a ser femininos em
+ * português), não uma fonte de verdade sobre a pessoa. Erros possíveis (nome
+ * estrangeiro, nome unissex) ficam visíveis no preview da mensagem antes de
+ * enviar. */
+function inferGenderTitle(fullName: string): "Dr." | "Dra." | null {
+  const firstName = fullName.trim().split(" ")[0];
+  if (!firstName) return null;
+  const normalized = normalizeForMatch(firstName);
+  if (MALE_FIRST_NAME_EXCEPTIONS.has(normalized)) return "Dr.";
+  if (FEMALE_FIRST_NAME_EXCEPTIONS.has(normalized)) return "Dra.";
+  return normalized.endsWith("a") ? "Dra." : "Dr.";
+}
+
+/** Título automático (`Dr.`/`Dra.`) pra prefixar `nome`/`primeiro_nome` em
+ * `buildTemplateVars` — só quando a categoria do lead sugere profissão
+ * liberal/saúde (ver `isTitleEligibleCategory`); fora disso, `null` (sem
+ * título). Pode ser sobrescrito por mensagem via `titulo_override` (ver
+ * `buildTemplateVars`), inclusive forçando um título numa categoria que não
+ * bateria aqui, ou removendo o título numa que bateria. */
+function autoTitleForLead(fullName: string, category: string | null): "Dr." | "Dra." | null {
+  if (!fullName || !isTitleEligibleCategory(category)) return null;
+  return inferGenderTitle(fullName);
+}
+
 export function buildTemplateVars(
   lead: { full_name: string | null; city: string | null; category: string | null },
-  extras: Partial<Record<Exclude<VarKey, "nome" | "primeiro_nome" | "cidade" | "categoria">, string | null>> = {}
+  extras: Partial<Record<Exclude<VarKey, "nome" | "primeiro_nome" | "cidade" | "categoria">, string | null>> & {
+    /** Override manual do título automático, escolhido no composer: `undefined`
+     * usa o palpite automático (`autoTitleForLead`), `"Dr."`/`"Dra."` força
+     * esse título independente do palpite, e `""` força NENHUM título mesmo
+     * que a categoria/nome sugerissem um. Não é uma variável de template (não
+     * existe `{{titulo_override}}` em texto nenhum) — só muda como `nome` e
+     * `primeiro_nome` são montados aqui dentro, então qualquer modelo que já
+     * use `{{primeiro_nome}}` ganha o título de graça, sem precisar editar
+     * texto nenhum. */
+    titulo_override?: "Dr." | "Dra." | "" | null;
+  } = {}
 ): WhatsappTemplateVars {
   const fullName = lead.full_name?.trim() || "";
+  const title =
+    extras.titulo_override !== undefined && extras.titulo_override !== null
+      ? extras.titulo_override || null
+      : autoTitleForLead(fullName, lead.category);
+  const firstName = fullName ? fullName.split(" ")[0] : "";
   return {
-    nome: fullName || null,
-    primeiro_nome: fullName ? fullName.split(" ")[0] : null,
+    nome: fullName ? (title ? `${title} ${fullName}` : fullName) : null,
+    primeiro_nome: fullName ? (title ? `${title} ${firstName}` : firstName) : null,
     cidade: lead.city?.trim() || null,
     categoria: lead.category?.trim() || null,
     consultor: extras.consultor?.trim() || null,

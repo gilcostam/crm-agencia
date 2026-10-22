@@ -86,8 +86,12 @@ export default function InstagramComposerModal({
 
   const [consultor, setConsultor] = useState("");
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
+  // Ver mesmo campo no WhatsAppComposerModal.tsx: "auto" deixa buildTemplateVars
+  // decidir Dr./Dra. sozinho (nome + categoria do lead), as outras opções
+  // forçam um valor só pra essa mensagem.
+  const [titleOverride, setTitleOverride] = useState<"auto" | "Dr." | "Dra." | "nenhum">("auto");
   const [templateId, setTemplateId] = useState(() =>
-    defaultTemplateIdForStatus(lead.status, channel, lead.meeting_datetime)
+    defaultTemplateIdForStatus(lead.status, channel, lead.meeting_datetime, lead.remarketing_stage)
   );
   const [blockTexts, setBlockTexts] = useState<string[]>([]);
   const [blockDirty, setBlockDirty] = useState<boolean[]>([]);
@@ -210,10 +214,21 @@ export default function InstagramComposerModal({
         {
           consultor,
           reuniao: formatMeetingForMessage(lead.meeting_datetime, channel === "internacional" ? "en-US" : "pt-BR"),
+          titulo_override:
+            titleOverride === "auto" ? undefined : titleOverride === "nenhum" ? "" : titleOverride,
           ...extraValues,
         }
       ),
-    [lead.full_name, lead.city, lead.category, lead.meeting_datetime, consultor, extraValues, channel]
+    [
+      lead.full_name,
+      lead.city,
+      lead.category,
+      lead.meeting_datetime,
+      consultor,
+      extraValues,
+      channel,
+      titleOverride,
+    ]
   );
 
   const renderedBlocks = useMemo(() => renderWhatsappBlocks(template, vars), [template, vars]);
@@ -394,6 +409,21 @@ export default function InstagramComposerModal({
               placeholder="ex.: Gil"
               className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
             />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[10px] font-medium uppercase tracking-wide text-neutral-500">
+              Tratamento
+            </span>
+            <select
+              value={titleOverride}
+              onChange={(e) => setTitleOverride(e.target.value as typeof titleOverride)}
+              className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+            >
+              <option value="auto">Automático (Dr./Dra. conforme nome)</option>
+              <option value="Dr.">Forçar Dr.</option>
+              <option value="Dra.">Forçar Dra.</option>
+              <option value="nenhum">Nenhum (sem título)</option>
+            </select>
           </label>
           {extraKeysForTemplate.map((key) => (
             <label key={key} className="block">

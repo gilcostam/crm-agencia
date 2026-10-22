@@ -89,9 +89,33 @@ export interface Lead {
    * (ao entrar em status 'contrato_assinado' — ver app/api/leads/[id]/route.ts).
    * Aponta pro id do cliente criado. */
   converted_to_client_id: string | null;
+  /** Em qual das 3 mensagens da sequência de remarketing (ver
+   * lib/whatsapp-templates.ts, canal "remarketing") o lead está — só faz
+   * sentido pra leads com `status: "finalizado"` (ver
+   * app/dashboard/remarketing/page.tsx). `null` = nenhuma mensagem ainda
+   * (lead acabou de cair em "finalizado"). Alterado manualmente pelo
+   * vendedor num seletor no próprio card (não avança sozinho ao enviar),
+   * pra ela controlar o ritmo real da conversa, não um contador automático.
+   * Também alimenta o default de qual modelo abrir no composer (ver
+   * defaultTemplateIdForStatus). */
+  remarketing_stage: RemarketingStage | null;
   created_at: string;
   updated_at: string;
 }
+
+export type RemarketingStage = "mensagem_1" | "mensagem_2" | "mensagem_3";
+
+export const REMARKETING_STAGE_LABELS: Record<RemarketingStage, string> = {
+  mensagem_1: "1ª mensagem enviada",
+  mensagem_2: "2ª mensagem enviada",
+  mensagem_3: "3ª mensagem enviada (última)",
+};
+
+export const REMARKETING_STAGE_ORDER: RemarketingStage[] = [
+  "mensagem_1",
+  "mensagem_2",
+  "mensagem_3",
+];
 
 export const STATUS_LABELS: Record<LeadStatus, string> = {
   novo_lead: "Novo Lead",

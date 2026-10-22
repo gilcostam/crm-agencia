@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { hasValidSession } from "@/lib/auth";
 import { createServiceClient } from "@/lib/supabase/server";
-import { LeadStatus, STATUS_LABELS, STATUS_ORDER } from "@/lib/types";
+import {
+  LeadStatus,
+  REMARKETING_STAGE_LABELS,
+  REMARKETING_STAGE_ORDER,
+  RemarketingStage,
+  STATUS_LABELS,
+  STATUS_ORDER,
+} from "@/lib/types";
 import { syncLeadStatusToTrello } from "@/lib/trello";
 import { buildStatusChangeUpdate, FOLLOWUP_INTERVAL_HOURS } from "@/lib/lead-status";
 
@@ -34,6 +41,7 @@ export async function PATCH(
     category,
     source,
     outreach_language,
+    remarketing_stage,
   } = body as {
     status?: string;
     notes?: string;
@@ -44,6 +52,7 @@ export async function PATCH(
     category?: string | null;
     source?: string;
     outreach_language?: "en" | "pt" | null;
+    remarketing_stage?: RemarketingStage | null;
   };
 
   const update: {
@@ -57,6 +66,7 @@ export async function PATCH(
     source?: string;
     status_dates?: Partial<Record<LeadStatus, string>>;
     outreach_language?: "en" | "pt" | null;
+    remarketing_stage?: RemarketingStage | null;
   } = {};
 
   if (status !== undefined) {
@@ -111,6 +121,16 @@ export async function PATCH(
     update.outreach_language = outreach_language;
   }
 
+  if (remarketing_stage !== undefined) {
+    if (
+      remarketing_stage !== null &&
+      !REMARKETING_STAGE_ORDER.includes(remarketing_stage as RemarketingStage)
+    ) {
+      return NextResponse.json({ error: "remarketing_stage inválido" }, { status: 400 });
+    }
+    update.remarketing_stage = remarketing_stage;
+  }
+
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "nada para atualizar" }, { status: 400 });
   }
@@ -123,7 +143,7 @@ export async function PATCH(
   const { data: before } = await supabase
     .from("leads")
     .select(
-      "status, notes, meeting_datetime, monthly_value, converted_to_client_id, external_key, status_dates, source"
+      "status, notes, meeting_datetime, monthly_value, converted_to_client_id, external_key, status_dates, source, remarketing_stage"
     )
     .eq("id", id)
     .single();
@@ -204,6 +224,16 @@ export async function PATCH(
         lead_id: id,
         type: "note",
         message: notes ? "Observações atualizadas" : "Observações removidas",
+      });
+    }
+
+    if (remarketing_stage !== undefined && before.remarketing_stage !== remarketing_stage) {
+      events.push({
+        lead_id: id,
+        type: "note",
+        message: remarketing_stage
+          ? `Remarketing: ${REMARKETING_STAGE_LABELS[remarketing_stage as RemarketingStage]}`
+          : "Remarketing: etapa removida",
       });
     }
 
