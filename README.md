@@ -51,9 +51,6 @@ Variáveis:
 | `META_PAGE_ACCESS_TOKEN` | Token de acesso da Página com permissão `leads_retrieval` |
 | `N8N_WHATSAPP_WEBHOOK_URL` | URL do webhook do fluxo n8n "No Limits - Disparo Automático Meta Leads" (passo 5) |
 | `WHATSAPP_WEBHOOK_SECRET` | Segredo compartilhado que o n8n deve enviar no header `X-Webhook-Secret` ao chamar `/api/webhook/whatsapp` de volta |
-| `CRON_SECRET` | Segredo do cron de lembretes (passo 6). Gere com `openssl rand -hex 32` e cadastre também na Vercel: ela manda esse valor em `Authorization: Bearer` nas chamadas agendadas |
-| `N8N_LEMBRETE_WEBHOOK_URL` | Webhook do fluxo n8n **de lembrete**, que precisa ser diferente do `N8N_WHATSAPP_WEBHOOK_URL` (passo 6). Sem ela, o cron roda e não envia nada |
-| `CRM_CONSULTOR_NOME` | Nome que assina o lembrete automático. Em branco, a assinatura não aparece e a mensagem continua inteira |
 
 ## 4. Rodar em desenvolvimento
 
@@ -199,67 +196,3 @@ scripts/
 supabase/
   schema.sql                          Schema completo (rodar no SQL Editor)
 ```
-
-
-## 6. Lembrete automático de reunião (anti no-show)
-
-Nas 41 reuniões medidas na base, as 22 que receberam alguma confirmação deram
-18% de no-show e as 19 que não receberam deram 58%. A mensagem que faz essa
-diferença já existia (modelo `lembrete_reuniao`); o que faltava era alguém
-lembrar de mandar na véspera.
-
-`/api/cron/lembretes` resolve isso. A Vercel chama duas vezes por dia
-(`vercel.json`: 12:00 e 20:00 UTC, ou 09:00 e 17:00 de Brasília), a rota
-procura reuniões que acontecem entre 6h e 36h à frente, pula quem já recebeu o
-lembrete daquela data e quem foi confirmado à mão nas últimas 24h, e manda o
-resto pro n8n.
-
-### Por que um fluxo n8n novo, e não o que já existe
-
-`N8N_WHATSAPP_WEBHOOK_URL` dispara a sequência de **boas-vindas**. Reaproveitar
-aquele webhook não faria o n8n mandar um lembrete: faria ele mandar uma
-mensagem de primeiro contato para alguém que já tem reunião marcada para
-amanhã. É pior do que não mandar nada.
-
-Por isso o lembrete usa `N8N_LEMBRETE_WEBHOOK_URL`. **Enquanto essa variável
-não existir, o cron roda e não envia nada** — é a falha segura.
-
-### O que o fluxo do n8n precisa fazer
-
-Só entregar. O texto chega pronto no campo `mensagem`, montado aqui a partir
-do modelo `lembrete_reuniao` (ver `lib/whatsapp-templates.ts`), para a redação
-ficar versionada num lugar só em vez de duplicada dentro de um nó do n8n.
-
-Payload recebido:
-
-```json
-{
-  "lead_id": "uuid",
-  "full_name": "Ivan Bruniera",
-  "telefone": "+5519998657821",
-  "cidade": "Pirassununga",
-  "especialidade": "Implantodontia",
-  "reuniao": "2026-11-17T12:00:00+00:00",
-  "reuniao_formatada": "terça-feira, 17/11, 09:00",
-  "mensagem": "Dr. Ivan, passando pra lembrar da nossa conversa..."
-}
-```
-
-O fluxo deve responder 2xx. Em erro, o CRM registra no log e **não** marca o
-lembrete como enviado, então a próxima execução tenta de novo.
-
-### Para ligar
-
-1. Crie o fluxo no n8n: webhook → envia `mensagem` para `telefone`.
-2. Cadastre na Vercel (Settings → Environment Variables): `CRON_SECRET`,
-   `N8N_LEMBRETE_WEBHOOK_URL` e, opcionalmente, `CRM_CONSULTOR_NOME`.
-3. Confira em Deployments → Cron Jobs que as duas execuções aparecem.
-
-Para testar sem esperar o horário:
-
-```bash
-curl -H "Authorization: Bearer $CRON_SECRET" https://SEU-DOMINIO/api/cron/lembretes
-```
-
-A resposta traz `enviados` e, por lead, o que foi feito: `enviado`,
-`ja_enviado`, `confirmado_na_mao` ou o erro do n8n.
