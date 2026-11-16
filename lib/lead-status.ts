@@ -8,7 +8,15 @@ export const FOLLOWUP_INTERVAL_HOURS = 48;
 /** Status que, ao serem alcançados, disparam o agendamento automático do
  * próximo follow-up (48h à frente) — a sequência de tentativas de contato.
  * "no_show" entra aqui também: vira um lembrete de mandar a mensagem de
- * resgate pra quem faltou à reunião. */
+ * resgate pra quem faltou à reunião.
+ *
+ * "diagnostico_enviado" entrou depois, e por um motivo medido: ele não
+ * estava nesta lista nem na de limpar, então era um status sem relógio
+ * nenhum. O lead entrava ali e ficava, porque nada agendava um retorno e
+ * nada limpava o retorno velho. Dos 23 leads parados nesse status, 19
+ * estavam com follow-up vencido de meses antes e a mediana de silêncio era
+ * de 76 dias. Mandar o diagnóstico é o ponto mais perto da venda em todo o
+ * funil, e era o único lugar onde o CRM não pedia o próximo passo. */
 const AUTO_FOLLOWUP_STATUSES: LeadStatus[] = [
   "primeiro_contato",
   "segundo_contato",
@@ -18,6 +26,7 @@ const AUTO_FOLLOWUP_STATUSES: LeadStatus[] = [
   "sexto_contato",
   "setimo_contato",
   "no_show",
+  "diagnostico_enviado",
 ];
 
 /** Status "de saída" do funil de contato — ao entrar neles não faz mais

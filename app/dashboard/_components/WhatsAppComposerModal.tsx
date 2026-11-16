@@ -357,6 +357,46 @@ export default function WhatsAppComposerModal({
           }"`,
         }),
       });
+      /* Status sem próximo passo: reagenda o retorno aqui mesmo.
+       *
+       * O follow-up automático de 48h é calculado em buildStatusChangeUpdate
+       * (lib/lead-status.ts), que só roda quando o STATUS MUDA. Nos contatos
+       * numerados isso basta, porque mandar a mensagem e arrastar o card pro
+       * próximo contato são a mesma ação. Em "Diagnóstico Enviado" não há
+       * próximo contato pra arrastar: o lead manda ou não manda resposta, e
+       * enquanto não manda ele fica exatamente onde está.
+       *
+       * Resultado medido antes disto: 23 leads parados nesse status, 19 com
+       * follow-up vencido de meses antes, mediana de 76 dias de silêncio.
+       * Nenhum deles sumiu por decisão; sumiram porque nada marcava a volta.
+       *
+       * Best-effort: se falhar, a mensagem já foi, e o evento já ficou
+       * gravado. Não vale derrubar nada por causa de uma data. */
+      if (lead.status === "diagnostico_enviado") {
+        const volta = new Date();
+        volta.setDate(volta.getDate() + 2);
+        const voltaISO = volta.toISOString().slice(0, 10);
+        try {
+          await fetch(`/api/leads/${lead.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ next_followup: voltaISO }),
+          });
+          await fetch(`/api/leads/${lead.id}/events`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "note",
+              message: `Follow-up agendado para ${volta.toLocaleDateString(
+                "pt-BR"
+              )} (48h após esta mensagem). O status "Diagnóstico Enviado" não muda sozinho, então o retorno é marcado no envio.`,
+            }),
+          });
+        } catch {
+          // idem: a data é um lembrete, não parte do envio
+        }
+      }
+
       onLogged?.();
     } catch {
       // best-effort, não impede o envio da mensagem
