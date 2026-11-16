@@ -167,6 +167,13 @@ const MEETING_URGENCY_BADGE_STYLES: Record<MeetingUrgency, string> = {
  * primeiro quem precisa de atenção agora. */
 const MEETING_URGENCY_ORDER: MeetingUrgency[] = ["iminente", "atrasada", "proxima", "distante"];
 
+/** Colunas do quadro de Reuniões. "sem_data" não vem de MeetingUrgency (não é
+ * uma faixa de proximidade, é a falta da informação) e vem primeiro de
+ * propósito: reunião sem data é o caso mais urgente do quadro, não o menos.
+ * Antes de existir esta coluna, esses leads não apareciam em coluna nenhuma. */
+type MeetingColumn = MeetingUrgency | "sem_data";
+const MEETING_URGENCY_COLUMNS: MeetingColumn[] = ["sem_data", ...MEETING_URGENCY_ORDER];
+
 function formatBytes(bytes: number | null | undefined): string {
   if (!bytes) return "";
   if (bytes < 1024) return `${bytes} B`;
@@ -1139,6 +1146,7 @@ export default function DashboardClient({
   defaultLeadSource,
   groupByMeetingUrgency = false,
   groupByRemarketingStage = false,
+  confirmacoes,
 }: {
   initialLeads: Lead[];
   /** Título exibido no cabeçalho da página (ex.: "Prospecção Ativa" na tela
@@ -1198,6 +1206,16 @@ export default function DashboardClient({
    * groupByMeetingUrgency, mas as duas nunca são usadas juntas na prática
    * (cada janela liga só uma). */
   groupByRemarketingStage?: boolean;
+  /** Por lead, quando a última mensagem de confirmação de reunião foi enviada
+   * (ver CONFIRMACAO_LABELS em lib/whatsapp-templates e a consulta em
+   * app/dashboard/reunioes/page.tsx). Só a janela de Reuniões passa isso.
+   *
+   * Serve pra responder, no card, a pergunta que mais separa quem comparece
+   * de quem falta: este lead foi lembrado? Nas 41 reuniões da base, as
+   * confirmadas deram 18% de no-show e as não confirmadas 58%. A informação
+   * existia na timeline desde sempre, mas só abrindo lead por lead, então
+   * não havia como "faltam 4 confirmações" virar tarefa. */
+  confirmacoes?: Record<string, string>;
 }) {
   const [leads, setLeads] = useState<Lead[]>(initialLeads);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -1815,6 +1833,31 @@ export default function DashboardClient({
       );
   }, [leads]);
 
+  /* Reuniões que acontecem nas próximas 48h e ainda não receberam nenhuma
+     mensagem de confirmação.
+   *
+   * 48h e não 24h porque a confirmação que funciona sai na véspera: no dia
+   * da reunião o lead já organizou a agenda dele e a mensagem vira aviso, não
+   * combinação. Reunião já vencida fica de fora, porque ali o assunto não é
+   * mais confirmar e sim retomar (ver retomada_reuniao_perdida).
+   *
+   * Só existe na janela de Reuniões, que é a única que recebe `confirmacoes`. */
+  const confirmacoesPendentes = useMemo(() => {
+    if (!confirmacoes) return [];
+    const agora = Date.now();
+    return leads
+      .filter((l) => {
+        if (!l.meeting_datetime || confirmacoes[l.id]) return false;
+        const h = (new Date(l.meeting_datetime).getTime() - agora) / 36e5;
+        return h >= 0 && h <= 48;
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.meeting_datetime as string).getTime() -
+          new Date(b.meeting_datetime as string).getTime()
+      );
+  }, [leads, confirmacoes]);
+
   const selectedLead = leads.find((l) => l.id === selectedLeadId) ?? null;
   const composerLead = leads.find((l) => l.id === composerLeadId) ?? null;
   const instagramComposerLead = leads.find((l) => l.id === instagramComposerLeadId) ?? null;
@@ -1960,6 +2003,25 @@ export default function DashboardClient({
               </span>
             );
           })()}
+          {/* Reunião sem lembrete enviado. Só aparece na janela de Reuniões,
+              que é a única que recebe `confirmacoes`. Vermelho de propósito:
+              é o sinal que antecede o no-show, e ele precisa competir em
+              atenção com a própria data da reunião. */}
+          {confirmacoes !== undefined && lead.status === "reuniao_marcada" && (() => {
+            const quando = confirmacoes[lead.id];
+            if (!quando) {
+              return (
+                <span className="inline-block rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-700">
+                  Sem confirmação
+                </span>
+              );
+            }
+            return (
+              <span className="inline-block rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+                Confirmado {formatDate(quando)}
+              </span>
+            );
+          })()}
           {lead.next_followup && (() => {
             const urgency = followupUrgency(lead.next_followup, today) ?? "on_time";
             const formattedDate = new Date(`${lead.next_followup}T00:00:00`).toLocaleDateString("pt-BR");
@@ -2046,6 +2108,46 @@ export default function DashboardClient({
       </header>
 
       <main className="mx-auto max-w-7xl px-6 py-8">
+        {/* Fica ACIMA do aviso de "reunião hoje" de propósito: aquele diz o que
+            vai acontecer, este diz o que falta fazer pra acontecer. Nas 41
+            reuniões medidas, confirmada deu 18% de no-show e não confirmada
+            58%, então esta é a lista mais cara da tela. */}
+        {confirmacoesPendentes.length > 0 && (
+          <div className="mb-5 rounded-md border border-red-300 bg-red-50 px-4 py-2.5 text-sm text-red-800">
+            <div>
+              ⚠{" "}
+              <strong>
+                {confirmacoesPendentes.length === 1
+                  ? "1 reunião nas próximas 48h sem confirmação"
+                  : `${confirmacoesPendentes.length} reuniões nas próximas 48h sem confirmação`}
+                :
+              </strong>{" "}
+              {confirmacoesPendentes.map((l, i) => (
+                <span key={l.id}>
+                  {i > 0 && ", "}
+                  <button
+                    onClick={() => setComposerLeadId(l.id)}
+                    className="underline decoration-dotted hover:text-red-950"
+                  >
+                    {new Date(l.meeting_datetime as string).toLocaleString("pt-BR", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}{" "}
+                    {l.full_name || "sem nome"}
+                  </button>
+                </span>
+              ))}
+            </div>
+            <p className="mt-1 text-[12px] text-red-700">
+              Clique no nome pra abrir o WhatsApp já com a mensagem de
+              confirmação. Quem é confirmado falta em 18% dos casos; quem não
+              é, em 58%.
+            </p>
+          </div>
+        )}
+
         {todaysMeetings.length > 0 && (
           <div className="mb-5 rounded-md border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
             📅 <strong>{todaysMeetings.length === 1 ? "Reunião hoje" : "Reuniões hoje"}:</strong>{" "}
@@ -2412,22 +2514,57 @@ export default function DashboardClient({
         <div className="overflow-x-auto pb-2" style={{ transform: "scaleY(-1)" }}>
         <div className="flex min-w-min gap-4" style={{ transform: "scaleY(-1)" }}>
           {groupByMeetingUrgency
-            ? MEETING_URGENCY_ORDER.map((urgency) => {
+            ? MEETING_URGENCY_COLUMNS.map((urgency) => {
+                /* "sem_data" não é uma faixa de urgência, é a ausência de
+                   data. Precisa de coluna própria porque meetingUrgency
+                   devolve null nesse caso, e null não casava com nenhuma das
+                   4 faixas: o lead era buscado pela página e depois não era
+                   desenhado em lugar nenhum. Sumia da única tela feita pra
+                   evitar que ele sumisse.
+
+                   Não é detalhe: dos 15 no-shows da base, 13 estão sem
+                   `meeting_datetime`, quase sempre porque o card foi
+                   arrastado no Trello e a data nunca foi preenchida aqui.
+                   Reunião sem data é reunião que ninguém consegue lembrar,
+                   confirmar nem cobrar, então ela abre o quadro em vez de
+                   não aparecer nele. */
+                const semData = urgency === "sem_data";
                 const columnLeads = filteredLeads
-                  .filter((l) => meetingUrgency(l.meeting_datetime) === urgency)
-                  .sort(
-                    (a, b) =>
-                      new Date(a.meeting_datetime as string).getTime() -
-                      new Date(b.meeting_datetime as string).getTime()
+                  .filter((l) =>
+                    semData
+                      ? !l.meeting_datetime
+                      : meetingUrgency(l.meeting_datetime) === urgency
+                  )
+                  .sort((a, b) =>
+                    semData
+                      ? new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime()
+                      : new Date(a.meeting_datetime as string).getTime() -
+                        new Date(b.meeting_datetime as string).getTime()
                   );
                 return (
-                  <div key={urgency} className="w-72 shrink-0 rounded-lg bg-white p-3 shadow-sm">
+                  <div
+                    key={urgency}
+                    className={`w-72 shrink-0 rounded-lg p-3 shadow-sm ${
+                      semData && columnLeads.length > 0 ? "bg-red-50 ring-1 ring-red-200" : "bg-white"
+                    }`}
+                  >
                     <div className="mb-3 flex items-center justify-between px-1">
-                      <h2 className="text-xs font-medium uppercase tracking-wide text-neutral-500">
-                        {MEETING_URGENCY_LABELS[urgency]}
+                      <h2
+                        className={`text-xs font-medium uppercase tracking-wide ${
+                          semData && columnLeads.length > 0 ? "text-red-700" : "text-neutral-500"
+                        }`}
+                      >
+                        {semData ? "Sem data marcada" : MEETING_URGENCY_LABELS[urgency]}
                       </h2>
                       <span className="text-xs text-neutral-400">{columnLeads.length}</span>
                     </div>
+                    {semData && columnLeads.length > 0 && (
+                      <p className="mb-2 px-1 text-[11px] leading-snug text-red-700">
+                        Reunião aceita e sem data no CRM. Sem data não dá pra
+                        lembrar nem confirmar, e é assim que a maioria dos
+                        no-shows começa. Abra o lead e preencha.
+                      </p>
+                    )}
                     <div className="space-y-2">
                       {columnLeads.length === 0 && (
                         <p className="px-1 py-6 text-center text-xs text-neutral-400">

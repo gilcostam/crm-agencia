@@ -448,7 +448,7 @@ const INSTAGRAM_LEMBRETE_REUNIAO_TEXT =
   `Lembrete rápido: nossa conversa é{{#reuniao}} {{reuniao}}{{/reuniao}}! Vou te mostrar ao vivo as oportunidades no Google pra crescerem além do Instagram, e quem comparecer garante um bônus exclusivo. Confirma presença?`;
 
 const INSTAGRAM_CURIOSIDADE_REUNIAO_TEXT =
-  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}enquanto isso já fui adiantando algo aqui: achei um ponto específico{{#categoria}} d{{categoria}}{{/categoria}} no Google que pretendo te mostrar na nossa conversa{{#reuniao}} de {{reuniao}}{{/reuniao}}. Não é nada que dá pra resolver só com Instagram. Vale muito a pena reservar esse horário 👀`;
+  `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}enquanto isso já fui adiantando algo aqui: achei um ponto específico{{#categoria}} de {{categoria}}{{/categoria}} no Google que pretendo te mostrar na nossa conversa{{#reuniao}} de {{reuniao}}{{/reuniao}}. Não é nada que dá pra resolver só com Instagram. Vale muito a pena reservar esse horário 👀`;
 
 const INSTAGRAM_NO_SHOW_TEXT =
   `Não consegui falar com você no horário combinado, sem problema! Separei um resumo rápido do que encontramos: hoje{{#categoria}} outros negócios de {{categoria}}{{/categoria}}{{^categoria}} outros concorrentes{{/categoria}} vêm ganhando mais espaço no Google. Quer que eu te mande agora, ou prefere remarcar?`;
@@ -811,7 +811,7 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
     appliesTo: ["reuniao_marcada"],
     channel: "ambos",
     text: withSignature(
-      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}enquanto isso vou adiantando algo aqui: encontrei um ponto bem específico{{#categoria}} d{{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} no Google que pretendo te mostrar direitinho na nossa conversa{{#reuniao}} de {{reuniao}}{{/reuniao}} — algo que pode estar custando pacientes pra vocês sem que percebam. Vale muito a pena reservar esse horário, prometo que não vai ser "só mais uma reunião". Nos falamos lá!`
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}enquanto isso vou adiantando algo aqui: encontrei um ponto bem específico{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} no Google que pretendo te mostrar direitinho na nossa conversa{{#reuniao}} de {{reuniao}}{{/reuniao}} — algo que pode estar custando pacientes pra vocês sem que percebam. Vale muito a pena reservar esse horário, prometo que não vai ser "só mais uma reunião". Nos falamos lá!`
     ),
   },
   {
@@ -822,7 +822,7 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
     appliesTo: ["reuniao_marcada"],
     channel: "ambos",
     text: withSignature(
-      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}passando pra lembrar da nossa conversa{{#reuniao}} marcada pra {{reuniao}}{{/reuniao}}! Vou te mostrar ao vivo o diagnóstico completo{{#categoria}} d{{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} e as oportunidades reais pra atrair mais pacientes pelo Google e pelas buscas por IA.
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}passando pra lembrar da nossa conversa{{#reuniao}} marcada pra {{reuniao}}{{/reuniao}}! Vou te mostrar ao vivo o diagnóstico completo{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} e as oportunidades reais pra atrair mais pacientes pelo Google e pelas buscas por IA.
 
 Um adianto: só quem comparece à reunião garante, sem custo, um bônus exclusivo pra aumentar ainda mais a visibilidade do negócio. É uma condição especial só pra esse encontro, não fica disponível depois.
 
@@ -941,7 +941,7 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     appliesTo: [],
     channel: "ativo",
     text: withSignature(
-      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}sem problema, entendo perfeitamente. Só uma pergunta rápida, sem compromisso nenhum: esse "não tenho interesse" é porque já resolveram isso de outro jeito, ou é porque agora não é prioridade pra vocês? Pergunto porque, se for só uma questão de momento, posso deixar a análise gratuita{{#categoria}} d{{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} separada, pronta pra quando fizer sentido revisitar o assunto, sem ficar te enchendo enquanto isso.`
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}sem problema, entendo perfeitamente. Só uma pergunta rápida, sem compromisso nenhum: esse "não tenho interesse" é porque já resolveram isso de outro jeito, ou é porque agora não é prioridade pra vocês? Pergunto porque, se for só uma questão de momento, posso deixar a análise gratuita{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} separada, pronta pra quando fizer sentido revisitar o assunto, sem ficar te enchendo enquanto isso.`
     ),
   },
   {
@@ -1240,6 +1240,53 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
   },
 ];
 
+/**
+ * Modelos que contam como CONFIRMAÇÃO de uma reunião já marcada.
+ *
+ * Existe pra responder uma pergunta que o CRM não sabia responder: este lead
+ * foi lembrado da reunião dele, ou não?
+ *
+ * Medido nas 41 reuniões da base (8 fechadas, 18 marcadas, 15 no-show):
+ * 22 receberam confirmação e 19 não. Entre as confirmadas, 4 viraram
+ * no-show (18%). Entre as não confirmadas, 11 (58%). É a maior diferença
+ * que aparece nesses dados, maior que hora do dia, dia da semana ou
+ * antecedência.
+ *
+ * Correlação, não prova: são 41 casos, e é plausível que a confirmação vá
+ * justamente pros leads que já estavam mais quentes, o que inflaria o
+ * efeito. Mesmo assim é o único fator com tamanho suficiente pra agir, e o
+ * custo de agir é uma mensagem.
+ *
+ * O envio fica gravado como `note` na timeline, no formato
+ * `Mensagem de WhatsApp preparada (modelo "<label>")` (ver logEvent em
+ * WhatsAppComposerModal). Por isso o que se compara é o label, e por isso
+ * ele sai daqui em vez de ser escrito à mão em outro arquivo: label é texto
+ * de interface e muda, e uma cópia solta passaria a não casar com nada sem
+ * erro nenhum, voltando a dizer "ninguém foi lembrado" justamente depois de
+ * alguém ter sido.
+ */
+const CONFIRMACAO_IDS = new Set([
+  "reuniao_marcada",
+  "curiosidade_reuniao",
+  "lembrete_reuniao",
+  "instagram_reuniao_marcada",
+  "instagram_curiosidade_reuniao",
+  "instagram_lembrete_reuniao",
+  "intl_reuniao_marcada",
+  "intl_curiosidade_reuniao",
+  "intl_lembrete_reuniao",
+]);
+
+export const CONFIRMACAO_LABELS: string[] = WHATSAPP_TEMPLATES.filter((t) =>
+  CONFIRMACAO_IDS.has(t.id)
+).map((t) => t.label);
+
+/** A `note` gravada no envio cita o modelo entre aspas. Confere se a nota é
+ * de um dos modelos de confirmação. */
+export function noteEhConfirmacao(message: string): boolean {
+  return CONFIRMACAO_LABELS.some((label) => message.includes(`modelo "${label}"`));
+}
+
 /** Modelos visíveis pra um canal específico, na ordem em que devem aparecer
  * no seletor do composer (ativos/pagos primeiro, compartilhados por último).
  * Os canais "instagram", "internacional" e "remarketing" são tratados à
@@ -1396,6 +1443,18 @@ export function pickTemplateText(template: WhatsappTemplate, language: WhatsappL
  * campo A dentro de um bloco de campo B (ex.: `{{#categoria}}...{{#cidade}}
  * ...{{/cidade}}...{{/categoria}}`), já que uma única passagem de regex
  * deixaria o bloco interno sem processar. */
+/* Cuidado com elisão em volta de placeholder. Quatro modelos escreviam
+   `{{#categoria}} d{{categoria}}{{/categoria}}` querendo "de Cardiologia" e
+   entregando "dCardiologia" na mensagem do lead ("o diagnóstico completo
+   dClínico geral em Atibaia"). O render não tem como acusar isso: a seção
+   está bem formada e a saída é uma string válida.
+
+   O jeito certo já existia no arquivo, em DIAGNOSTICO_IA_BLOCKS: põe a letra
+   FORA e deixa cada ramo trazer o resto, `o mapa d{{#cidade}}e {{cidade}}
+   {{/cidade}}{{^cidade}}a sua região{{/cidade}}`, que resolve "de Atibaia" e
+   "da sua região" com a mesma linha. Colar a preposição no placeholder só
+   funciona quando os dois ramos começam igual, o que quase nunca acontece
+   em português. */
 const SECTION_RE = /\{\{([#^])(\w+)\}\}([\s\S]*?)\{\{\/\2\}\}/;
 
 export function renderWhatsappTemplate(
