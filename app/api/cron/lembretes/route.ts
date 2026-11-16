@@ -63,24 +63,34 @@ function marcaLembrete(meetingDatetime: string): string {
 }
 
 export async function GET(request: NextRequest) {
-  const esperado = process.env.CRON_SECRET;
-  if (!esperado) {
-    return NextResponse.json({ error: "CRON_SECRET não configurada" }, { status: 500 });
-  }
-  if (request.headers.get("authorization") !== `Bearer ${esperado}`) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-
+  /* A checagem do webhook vem ANTES da autenticação de propósito.
+   *
+   * Sem webhook esta rota não consegue enviar nada, faça quem fizer a
+   * chamada, então o que ela devolve é "ainda não ligado" e não um erro. Se
+   * o 500 viesse primeiro, o cron apareceria falhando duas vezes por dia
+   * durante todo o tempo entre o deploy e a criação do fluxo no n8n, e
+   * alerta que falha todo dia por projeto é alerta que ninguém mais lê, nem
+   * quando passa a ser verdade.
+   *
+   * A troca de ordem não abre nada: a única coisa que um chamador sem
+   * credencial descobre é que a integração não está configurada, e assim que
+   * ela estiver o segredo volta a ser exigido antes de qualquer envio. */
   const webhook = process.env.N8N_LEMBRETE_WEBHOOK_URL;
   if (!webhook) {
-    /* 200 e não 500: não é erro, é "ainda não ligado". O cron rodando todo
-       dia contra um 500 vira alerta de falha que ninguém mais lê. */
     return NextResponse.json({
       ok: true,
       enviados: 0,
       aviso:
         "N8N_LEMBRETE_WEBHOOK_URL não configurada. Crie o fluxo de lembrete no n8n e aponte essa variável pra ele. Nada foi enviado.",
     });
+  }
+
+  const esperado = process.env.CRON_SECRET;
+  if (!esperado) {
+    return NextResponse.json({ error: "CRON_SECRET não configurada" }, { status: 500 });
+  }
+  if (request.headers.get("authorization") !== `Bearer ${esperado}`) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
   const template = WHATSAPP_TEMPLATES.find((t) => t.id === "lembrete_reuniao");
