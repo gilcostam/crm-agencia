@@ -329,6 +329,14 @@ const RETOMADA_REUNIAO_BLOCKS: string[] = [
  * notícia sobre o produto, não desculpa sobre a demora, e é o que permite
  * reabrir sem constrangimento.
  *
+ * Vale para os rótulos também, não só para o texto: o seletor do composer
+ * dizia "Cobrança do diagnóstico enviado (PDF)" em quatro modelos, e rótulo
+ * é o que decide qual modelo a pessoa escolhe. Quem mandou a análise por
+ * mensagem lia "(PDF)" e concluía, com razão, que aquele modelo não era pro
+ * caso dela. Os rótulos agora falam só em "diagnóstico enviado", que cobre
+ * as duas formas de entrega; o arquivo continua existindo em parte da
+ * prospecção, então a frase não nega o PDF, apenas para de exigir ele.
+ *
  * O texto nunca diz "PDF", nem "arquivo", nem "relatório". O diagnóstico
  * destes leads sai por mensagem, montado com a busca de concorrentes do
  * próprio composer, e nenhum deles recebeu anexo nenhum. Citar um PDF que
@@ -768,9 +776,9 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
   },
   {
     id: "diagnostico_enviado",
-    label: "Cobrança do diagnóstico enviado (PDF)",
+    label: "Cobrança do diagnóstico enviado",
     description:
-      "Depois de enviar o relatório em PDF (fluxo à parte da cadência de 8 contatos), puxa pra marcar os 15 minutos de explicação. Use enquanto o envio é recente: passadas duas semanas, 'conseguiu dar uma olhada?' cobra do lead um silêncio que foi nosso, e o modelo certo passa a ser a retomada (ver retomada_diagnostico_vencido).",
+      "Depois de enviar o diagnóstico, seja por mensagem (análise montada com a busca de concorrentes) ou em arquivo, puxa pra marcar os 15 minutos de explicação. Fluxo à parte da cadência de 8 contatos. Use enquanto o envio é recente: passadas duas semanas, 'conseguiu dar uma olhada?' cobra do lead um silêncio que foi nosso, e o modelo certo passa a ser a retomada (ver retomada_diagnostico_vencido).",
     appliesTo: ["diagnostico_enviado"],
     /* Era "ativo", e isso deixava o modelo inalcançável justamente para quem
        mais recebe diagnóstico: dos 23 leads no status "diagnóstico enviado",
@@ -889,7 +897,7 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
     id: "retomada_diagnostico_vencido",
     label: "Retomada: diagnóstico que esfriou",
     description:
-      "Para quem recebeu o PDF há semanas e nunca teve retorno. Nunca pergunta se ele leu: a essa altura a pergunta cobra o lead por um silêncio que foi da agência. Usa a validade real do diagnóstico (posição de busca muda de mês para mês) como motivo legítimo de voltar, e oferece refazer a leitura com os números de hoje.",
+      "Para quem recebeu o diagnóstico há semanas e nunca teve retorno. Nunca pergunta se ele leu: a essa altura a pergunta cobra o lead por um silêncio que foi da agência. Usa a validade real do diagnóstico (posição de busca muda de mês para mês) como motivo legítimo de voltar, e oferece refazer a leitura com os números de hoje.",
     appliesTo: ["diagnostico_enviado"],
     channel: "ambos",
     text: RETOMADA_DIAGNOSTICO_BLOCKS.join("\n\n"),
@@ -1013,8 +1021,8 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
   },
   {
     id: "instagram_diagnostico_enviado",
-    label: "Cobrança do diagnóstico enviado (PDF)",
-    description: "Depois de enviar o relatório em PDF, puxa pra marcar os 15 minutos de explicação.",
+    label: "Cobrança do diagnóstico enviado",
+    description: "Depois de enviar o diagnóstico, por mensagem ou em arquivo, puxa pra marcar os 15 minutos de explicação.",
     appliesTo: ["diagnostico_enviado"],
     channel: "instagram",
     text: INSTAGRAM_DIAGNOSTICO_ENVIADO_TEXT,
@@ -1146,8 +1154,8 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
   },
   {
     id: "intl_diagnostico_enviado",
-    label: "Follow-up after full report sent (PDF)",
-    description: "Depois de enviar o relatório em PDF, puxa pra marcar os 15 minutos de explicação.",
+    label: "Follow-up after full report sent",
+    description: "Depois de enviar o diagnóstico, por mensagem ou em arquivo, puxa pra marcar os 15 minutos de explicação.",
     appliesTo: ["diagnostico_enviado"],
     channel: "internacional",
     text: INTL_DIAGNOSTICO_ENVIADO_TEXT,
