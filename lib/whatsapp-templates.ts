@@ -445,7 +445,7 @@ const INSTAGRAM_REUNIAO_MARCADA_TEXT =
   `Combinado{{#reuniao}} pra {{reuniao}}{{/reuniao}}! Vou te mostrar ao vivo o diagnóstico completo{{#categoria}} de {{categoria}}{{/categoria}} e como crescer no Google além do Instagram. Até lá!`;
 
 const INSTAGRAM_LEMBRETE_REUNIAO_TEXT =
-  `Lembrete rápido: nossa conversa é{{#reuniao}} {{reuniao}}{{/reuniao}}! Vou te mostrar ao vivo as oportunidades no Google pra crescerem além do Instagram, e quem comparecer garante um bônus exclusivo. Confirma presença?`;
+  `Lembrete rápido: nossa conversa é{{#reuniao}} {{reuniao}}{{/reuniao}}. Confirma pra mim? Pergunto porque eu rodo a análise na véspera, então o que eu te mostro é a sua posição de agora, não a do mês passado.`;
 
 const INSTAGRAM_CURIOSIDADE_REUNIAO_TEXT =
   `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}enquanto isso já fui adiantando algo aqui: achei um ponto específico{{#categoria}} de {{categoria}}{{/categoria}} no Google que pretendo te mostrar na nossa conversa{{#reuniao}} de {{reuniao}}{{/reuniao}}. Não é nada que dá pra resolver só com Instagram. Vale muito a pena reservar esse horário 👀`;
@@ -515,7 +515,7 @@ const INTL_REUNIAO_MARCADA_TEXT =
   `We're set{{#reuniao}} for {{reuniao}}{{/reuniao}}! I'll walk you through the full report live{{#categoria}} for your {{categoria}} business{{/categoria}} and show you exactly how to grow on Google and AI search. Talk soon!`;
 
 const INTL_LEMBRETE_REUNIAO_TEXT =
-  `Quick reminder: our call is{{#reuniao}} {{reuniao}}{{/reuniao}}! I'll show you live where you're losing visibility on Google and AI search, plus a free bonus just for showing up. Can you confirm you'll be there?`;
+  `Quick reminder: our call is{{#reuniao}} {{reuniao}}{{/reuniao}}. Can you confirm? I run the analysis the day before, so what you see is where you stand right now, not last month.`;
 
 const INTL_CURIOSIDADE_REUNIAO_TEXT =
   `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}quick heads-up before our call{{#reuniao}} on {{reuniao}}{{/reuniao}}: I found something specific{{#categoria}} about your {{categoria}} business{{/categoria}} online that I want to walk you through live, it's costing you customers right now without you knowing. Worth clearing your calendar for this one.`;
@@ -567,7 +567,7 @@ const INTL_PT_REUNIAO_MARCADA_TEXT =
   `Combinado{{#reuniao}} pra {{reuniao}}{{/reuniao}}! Vou te mostrar o relatório completo ao vivo{{#categoria}} do seu negócio de {{categoria}}{{/categoria}} e exatamente como crescer no Google e nas buscas com IA. Até lá!`;
 
 const INTL_PT_LEMBRETE_REUNIAO_TEXT =
-  `Lembrete rápido: nossa conversa é{{#reuniao}} {{reuniao}}{{/reuniao}}! Vou te mostrar ao vivo onde você está perdendo visibilidade no Google e nas buscas com IA, além de um bônus gratuito só por comparecer. Confirma presença?`;
+  `Lembrete rápido: nossa conversa é{{#reuniao}} {{reuniao}}{{/reuniao}}. Confirma pra mim? Eu rodo a análise na véspera, então o que eu te mostro é a sua posição de agora, não a do mês passado.`;
 
 const INTL_PT_CURIOSIDADE_REUNIAO_TEXT =
   `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}um aviso rápido antes da nossa conversa{{#reuniao}} de {{reuniao}}{{/reuniao}}: encontrei algo bem específico{{#categoria}} sobre o seu negócio de {{categoria}}{{/categoria}} que quero te mostrar ao vivo, está te custando cliente agora mesmo sem você saber. Vale muito a pena reservar esse horário.`;
@@ -814,19 +814,48 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
       `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}enquanto isso vou adiantando algo aqui: encontrei um ponto bem específico{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} no Google que pretendo te mostrar direitinho na nossa conversa{{#reuniao}} de {{reuniao}}{{/reuniao}} — algo que pode estar custando pacientes pra vocês sem que percebam. Vale muito a pena reservar esse horário, prometo que não vai ser "só mais uma reunião". Nos falamos lá!`
     ),
   },
+  /**
+   * Por que não existe mais "bônus exclusivo" aqui.
+   *
+   * O texto anterior prometia, logo depois de dizer "vou te mostrar ao vivo o
+   * diagnóstico completo", que quem comparecesse garantiria "sem custo, um
+   * bônus exclusivo". Perguntada qual era o bônus, a resposta foi: a análise
+   * de concorrência ao vivo e o diagnóstico completo com plano de ação. Ou
+   * seja, a própria reunião, prometida duas vezes na mesma mensagem com nomes
+   * diferentes. Quem não percebe não ganha nada com o parágrafo; quem percebe
+   * conclui que é truque, dois minutos antes de sentar na reunião.
+   *
+   * É o mesmo erro que aparece na precificação da agência: entregar acima do
+   * que se cobra e depois embrulhar a entrega como brinde. Isso não aumenta o
+   * valor percebido, dilui, porque transforma o que é o produto em cortesia.
+   *
+   * E não havia dado sustentando o bônus: o que separa 18% de no-show de 58%
+   * nas 41 reuniões medidas é ter recebido alguma confirmação, qualquer uma.
+   * Nenhuma delas mencionava bônus.
+   *
+   * No lugar entrou a única escassez que é verdade e não custa nada: a
+   * análise é rodada na véspera, então remarcar em cima da hora dá
+   * retrabalho. É propriedade real do produto (posição de busca muda de mês
+   * pra mês, o mesmo motivo que sustenta retomada_diagnostico_vencido), e não
+   * promete nada que precise ser entregue depois.
+   *
+   * E a pergunta subiu pra segunda linha. Ela é a única coisa da mensagem que
+   * precisa de resposta; enterrada no fim, depois de dois parágrafos, ela
+   * competia com o resto.
+   */
   {
     id: "lembrete_reuniao",
-    label: "Lembrete de reunião (com bônus)",
+    label: "Lembrete de reunião (confirmação)",
     description:
-      "Lembrete pra mandar perto da data marcada (véspera ou no dia), reforçando o horário e usando o gancho de um bônus exclusivo, só pra quem comparecer, pra reduzir no-show.",
+      "Lembrete pra mandar perto da data marcada (véspera ou no dia). Pede a confirmação na segunda linha, antes de qualquer outra coisa, porque é a única coisa que precisa de resposta. Não promete bônus: o motivo de comparecer é a própria análise, e ela é rodada na véspera.",
     appliesTo: ["reuniao_marcada"],
     channel: "ambos",
     text: withSignature(
-      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}passando pra lembrar da nossa conversa{{#reuniao}} marcada pra {{reuniao}}{{/reuniao}}! Vou te mostrar ao vivo o diagnóstico completo{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} e as oportunidades reais pra atrair mais pacientes pelo Google e pelas buscas por IA.
+      `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}passando pra lembrar da nossa conversa{{#reuniao}} de {{reuniao}}{{/reuniao}}. Confirma pra mim?
 
-Um adianto: só quem comparece à reunião garante, sem custo, um bônus exclusivo pra aumentar ainda mais a visibilidade do negócio. É uma condição especial só pra esse encontro, não fica disponível depois.
+Pergunto porque eu rodo a análise{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} na véspera, pra te mostrar como está a sua posição agora e não a do mês passado. Se precisar remarcar, sem problema nenhum: é só me avisar hoje que eu rodo de novo pro dia novo.
 
-Confirma presença{{#reuniao}} pra {{reuniao}}{{/reuniao}}?`
+No horário eu abro a tela e a gente olha junto: quem está aparecendo na frente na sua região, o que eles têm que você não tem, e o que dá pra corrigir primeiro.`
     ),
   },
   {
@@ -1046,8 +1075,8 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
   },
   {
     id: "instagram_lembrete_reuniao",
-    label: "Lembrete de reunião (com bônus)",
-    description: "Lembrete pra mandar perto da data marcada, com o gancho do bônus exclusivo pra quem comparecer, em versão curta.",
+    label: "Lembrete de reunião (confirmação)",
+    description: "Lembrete pra mandar perto da data marcada, em versão curta: pede a confirmação e usa a análise rodada na véspera como motivo de não remarcar em cima da hora.",
     appliesTo: ["reuniao_marcada"],
     channel: "instagram",
     text: INSTAGRAM_LEMBRETE_REUNIAO_TEXT,
@@ -1182,8 +1211,8 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
   },
   {
     id: "intl_lembrete_reuniao",
-    label: "Meeting reminder (with bonus)",
-    description: "Lembrete pra mandar perto da data marcada, com o gancho do bônus exclusivo pra quem comparecer, em versão curta.",
+    label: "Meeting reminder (confirmation)",
+    description: "Lembrete pra mandar perto da data marcada, em versão curta: pede a confirmação e usa a análise rodada na véspera como motivo de não remarcar em cima da hora.",
     appliesTo: ["reuniao_marcada"],
     channel: "internacional",
     text: INTL_LEMBRETE_REUNIAO_TEXT,
@@ -1318,8 +1347,8 @@ export function getTemplatesForChannel(channel: WhatsappChannel): WhatsappTempla
  * comportamento antigo) deixa a escolha automática seguir a proximidade real
  * da reunião (ver meetingUrgency em lib/types.ts), pra não deixar o lead
  * esfriar entre marcar e comparecer: "distante" é só confirmação, "proxima"
- * vira o aquecimento de curiosidade, "iminente" pede o lembrete com bônus (o
- * mais eficaz contra no-show) e "atrasada", que é data já vencida, puxa a
+ * vira o aquecimento de curiosidade, "iminente" pede o lembrete de
+ * confirmação (o mais eficaz contra no-show) e "atrasada", que é data já vencida, puxa a
  * retomada de reunião perdida em vez de pedir confirmação de uma reunião que
  * já não aconteceu. */
 /** Dias desde o último movimento no lead (`lead.updated_at`). Devolve null
