@@ -311,7 +311,7 @@ const PRIMEIRA_ABORDAGEM_BLOCKS: string[] = [
 const RETOMADA_REUNIAO_BLOCKS: string[] = [
   `{{#primeiro_nome}}{{primeiro_nome}}, tudo bem?{{/primeiro_nome}}{{^primeiro_nome}}Olá, tudo bem?{{/primeiro_nome}}`,
   `Nossa conversa{{#reuniao}} marcada pra {{reuniao}}{{/reuniao}} acabou não acontecendo, e retomar com você era comigo.`,
-  `Voltei no levantamento{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} esta semana e ele não está mais igual: posição no Google muda de mês pra mês, e nesse meio tempo mudou.{{#concorrente}} Hoje quem aparece na frente é {{concorrente}}.{{/concorrente}}`,
+  `Voltei no levantamento{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} esta semana e ele não está mais igual: posição no Google muda de mês pra mês, e nesse meio tempo mudou.{{#concorrente}} Quem aparece na frente hoje: {{concorrente}}.{{/concorrente}}`,
   `Deixa eu te fazer uma pergunta rápida: de todo mundo que te procurou nos últimos dois meses, você consegue dizer quantos chegaram pelo Google?`,
   `Pergunto porque é esse número que eu abro na tela em 20 minutos. Prefere começo da manhã ou fim da tarde? Te confirmo o horário hoje mesmo.${SIGNATURE}`,
 ];
@@ -328,12 +328,19 @@ const RETOMADA_REUNIAO_BLOCKS: string[] = [
  * Posição de busca é um retrato de um dia, e o retrato venceu. Isso é
  * notícia sobre o produto, não desculpa sobre a demora, e é o que permite
  * reabrir sem constrangimento.
+ *
+ * O texto nunca diz "PDF", nem "arquivo", nem "relatório". O diagnóstico
+ * destes leads sai por mensagem, montado com a busca de concorrentes do
+ * próprio composer, e nenhum deles recebeu anexo nenhum. Citar um PDF que
+ * não existe derruba a mensagem na segunda linha, porque a primeira coisa
+ * que o lead pensa é que a mensagem não é pra ele. "A análise que te mandei"
+ * é verdade nas duas formas de entrega, então é a forma que fica.
  */
 const RETOMADA_DIAGNOSTICO_BLOCKS: string[] = [
   `{{#primeiro_nome}}{{primeiro_nome}}, tudo bem?{{/primeiro_nome}}{{^primeiro_nome}}Olá, tudo bem?{{/primeiro_nome}}`,
-  `Preciso te avisar de uma coisa sobre o diagnóstico que te mandei: ele venceu. Aquilo é um retrato de um dia, e posição no Google muda de mês pra mês, então os números que estão lá já não descrevem como vocês aparecem hoje.`,
-  `Rodei de novo esta semana{{#categoria}} pra {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}.{{#concorrente}} Quem está na frente agora é {{concorrente}}.{{/concorrente}} Mudou coisa suficiente pra valer uma segunda olhada.`,
-  `E tem uma pergunta que o PDF não responde: de quem te procurou neste mês, você sabe quantos vieram do Google e quantos vieram de indicação?`,
+  `Preciso te avisar de uma coisa sobre a análise que te mandei: ela venceu. O que te mostrei era o retrato daquele dia, e posição no Google muda de mês pra mês, então aquilo já não descreve como vocês aparecem hoje.`,
+  `Rodei de novo esta semana{{#categoria}} pra {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}.{{#concorrente}} Quem aparece na frente hoje: {{concorrente}}.{{/concorrente}} Mudou coisa suficiente pra valer uma segunda olhada.`,
+  `E tem uma pergunta que nenhuma análise responde sozinha: de quem te procurou neste mês, você sabe quantos vieram do Google e quantos vieram de indicação?`,
   `Isso eu só consigo te mostrar ao vivo, com a tela compartilhada, e leva 20 minutos. Topa essa semana, de manhã ou no fim da tarde?${SIGNATURE}`,
 ];
 
@@ -352,7 +359,7 @@ const RETOMADA_DIAGNOSTICO_BLOCKS: string[] = [
  */
 const RETOMADA_NO_SHOW_BLOCKS: string[] = [
   `{{#primeiro_nome}}{{primeiro_nome}}, tudo bem?{{/primeiro_nome}}{{^primeiro_nome}}Olá, tudo bem?{{/primeiro_nome}}`,
-  `Apareceu uma informação nova aqui{{#categoria}} sobre {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} e lembrei de você.{{#concorrente}} Quem está aparecendo na frente nas buscas da região agora é {{concorrente}}.{{/concorrente}}`,
+  `Apareceu uma informação nova aqui{{#categoria}} sobre {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} e lembrei de você.{{#concorrente}} Quem aparece na frente nas buscas da região hoje: {{concorrente}}.{{/concorrente}}`,
   `O que isso significa na prática: quem pesquisa hoje e quem pergunta pra ChatGPT antes de escolher está sendo mandado pra lá. Não é questão de propaganda, é questão de quem o Google mostra primeiro.`,
   `Você tem ideia de quanta gente procura por{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} esse serviço{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} todo mês?`,
   `Esse número eu tenho aqui. São 10 minutos pra te mostrar, e eu me adapto ao seu horário. Funciona?${SIGNATURE}`,
@@ -379,7 +386,7 @@ const RETOMADA_NO_SHOW_BLOCKS: string[] = [
 const RETOMADA_DEPOIS_BLOCKS: string[] = [
   `{{#primeiro_nome}}{{primeiro_nome}}, tudo bem?{{/primeiro_nome}}{{^primeiro_nome}}Olá, tudo bem?{{/primeiro_nome}}`,
   `Você me pediu pra voltar mais pra frente, e eu demorei mais do que o combinado pra fazer isso.`,
-  `Estou voltando porque o cenário{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} mexeu desde então.{{#concorrente}} Quem aparece primeiro hoje é {{concorrente}}.{{/concorrente}} Quem entra nessa disputa mais tarde leva mais tempo pra subir, porque o espaço fica mais disputado, não menos.`,
+  `Estou voltando porque o cenário{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} mexeu desde então.{{#concorrente}} Quem aparece primeiro hoje: {{concorrente}}.{{/concorrente}} Quem entra nessa disputa mais tarde leva mais tempo pra subir, porque o espaço fica mais disputado, não menos.`,
   `Então te pergunto direto, e qualquer resposta serve: faz sentido olhar isso agora, ou prefere que eu volte a te procurar em um mês ou dois? Se for pra voltar depois, me diz o mês e eu respeito, sem ficar te mandando mensagem no meio.`,
   `Se for agora, são 20 minutos com a tela compartilhada, no horário que for melhor pra você.${SIGNATURE}`,
 ];
@@ -861,6 +868,13 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
   //    é que posição muda: um levantamento de agosto não descreve novembro.
   //    Isso é notícia, não desculpa, e notícia é o que faz uma mensagem
   //    atrasada soar natural em vez de constrangida.
+  //
+  // E uma regra de forma: `concorrente` chega como LISTA, não como nome. A
+  // busca automática devolve até 5 perfis numa frase só ("Lícia Kércia (5,0
+  // estrelas, 79 avaliações), Dra. Amanda Carvalho (...) e Gestar (...)"),
+  // então toda citação usa dois pontos, como já faz DIAGNOSTICO_IA_BLOCKS.
+  // "Quem aparece na frente hoje é <lista>" sai com erro de concordância na
+  // cara do lead sempre que a busca encontra mais de um.
   {
     id: "retomada_reuniao_perdida",
     label: "Retomada: reunião que não aconteceu",
