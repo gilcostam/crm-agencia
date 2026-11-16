@@ -120,7 +120,7 @@ export default function WhatsAppComposerModal({
   // liberal mesmo, ou bateu errado e o lead não usa título).
   const [titleOverride, setTitleOverride] = useState<"auto" | "Dr." | "Dra." | "nenhum">("auto");
   const [templateId, setTemplateId] = useState(() =>
-    defaultTemplateIdForStatus(lead.status, channel, lead.meeting_datetime, lead.remarketing_stage)
+    defaultTemplateIdForStatus(lead.status, channel, lead.meeting_datetime, lead.remarketing_stage, lead.updated_at)
   );
   // Mensagem representada como uma lista de blocos (ver renderWhatsappBlocks
   // em lib/whatsapp-templates.ts). Pra modelos sem `blocks` (a maioria), essa

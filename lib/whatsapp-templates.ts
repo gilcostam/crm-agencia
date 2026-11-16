@@ -284,6 +284,106 @@ const PRIMEIRA_ABORDAGEM_BLOCKS: string[] = [
   `Preparei uma análise gratuita mostrando esses números reais e o potencial de vocês aparecerem mais nessas buscas e atenderem mais gente. Posso te enviar? Não tem nenhum custo.${SIGNATURE}`,
 ];
 
+
+/**
+ * Retomada de reunião aceita que nunca aconteceu (ver
+ * `retomada_reuniao_perdida`).
+ *
+ * O bloco 2 assume a falha em uma oração e não explica o motivo. Explicar
+ * abre um assunto que não ajuda a fechar, e "desculpa o sumiço" informa ao
+ * lead que ele foi despriorizado.
+ *
+ * O bloco 5 pede a FAIXA do dia, não o dia. "Qual dia funciona pra você?"
+ * devolve ao lead a tarefa de abrir a agenda e escolher, que é justamente o
+ * trabalho que ele não fez na primeira vez. "Manhã ou fim da tarde?" é uma
+ * escolha de duas opções que ele responde com uma palavra.
+ *
+ * Nenhuma das quatro retomadas usa `link_agenda`, de propósito. Mandar link
+ * de agenda pra quem já não compareceu uma vez é pedir que ele faça o
+ * trabalho de marcar sozinho, e é o pedido que ele já ignorou. Além disso o
+ * composer avisa "faltou preencher" pra todo campo editável vazio, dizendo
+ * que a frase não entrou na mensagem: com o link opcional, esse aviso
+ * apareceria nas 65 retomadas da base dizendo que falta algo quando não
+ * falta nada. `concorrente` continua condicional porque ali o aviso é
+ * verdadeiro, a frase realmente sai, e serve de lembrete pra rodar a busca
+ * antes de mandar.
+ */
+const RETOMADA_REUNIAO_BLOCKS: string[] = [
+  `{{#primeiro_nome}}{{primeiro_nome}}, tudo bem?{{/primeiro_nome}}{{^primeiro_nome}}Olá, tudo bem?{{/primeiro_nome}}`,
+  `Nossa conversa{{#reuniao}} marcada pra {{reuniao}}{{/reuniao}} acabou não acontecendo, e retomar com você era comigo.`,
+  `Voltei no levantamento{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} esta semana e ele não está mais igual: posição no Google muda de mês pra mês, e nesse meio tempo mudou.{{#concorrente}} Hoje quem aparece na frente é {{concorrente}}.{{/concorrente}}`,
+  `Deixa eu te fazer uma pergunta rápida: de todo mundo que te procurou nos últimos dois meses, você consegue dizer quantos chegaram pelo Google?`,
+  `Pergunto porque é esse número que eu abro na tela em 20 minutos. Prefere começo da manhã ou fim da tarde? Te confirmo o horário hoje mesmo.${SIGNATURE}`,
+];
+
+/**
+ * Retomada de diagnóstico enviado e esquecido (ver
+ * `retomada_diagnostico_vencido`).
+ *
+ * Não existe aqui nenhuma variação de "conseguiu ver?". Essa pergunta
+ * funciona no terceiro dia; na décima semana ela cobra do lead um silêncio
+ * que foi da agência, e ainda revela que ninguém acompanhou o próprio envio.
+ *
+ * O motivo de voltar é o único que é verdade: o diagnóstico tem validade.
+ * Posição de busca é um retrato de um dia, e o retrato venceu. Isso é
+ * notícia sobre o produto, não desculpa sobre a demora, e é o que permite
+ * reabrir sem constrangimento.
+ */
+const RETOMADA_DIAGNOSTICO_BLOCKS: string[] = [
+  `{{#primeiro_nome}}{{primeiro_nome}}, tudo bem?{{/primeiro_nome}}{{^primeiro_nome}}Olá, tudo bem?{{/primeiro_nome}}`,
+  `Preciso te avisar de uma coisa sobre o diagnóstico que te mandei: ele venceu. Aquilo é um retrato de um dia, e posição no Google muda de mês pra mês, então os números que estão lá já não descrevem como vocês aparecem hoje.`,
+  `Rodei de novo esta semana{{#categoria}} pra {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}}.{{#concorrente}} Quem está na frente agora é {{concorrente}}.{{/concorrente}} Mudou coisa suficiente pra valer uma segunda olhada.`,
+  `E tem uma pergunta que o PDF não responde: de quem te procurou neste mês, você sabe quantos vieram do Google e quantos vieram de indicação?`,
+  `Isso eu só consigo te mostrar ao vivo, com a tela compartilhada, e leva 20 minutos. Topa essa semana, de manhã ou no fim da tarde?${SIGNATURE}`,
+];
+
+/**
+ * Retomada de quem faltou há semanas (ver `retomada_no_show_antigo`).
+ *
+ * A diferença com `no_show_resgate` é deliberada e está na primeira linha:
+ * este texto não menciona a ausência em nenhum momento. No dia seguinte,
+ * citar a falta é natural e até gentil. Passadas semanas, citar produz
+ * vergonha, e lead que se sente devendo explicação não responde: ele
+ * arquiva a conversa.
+ *
+ * O pedido também diminui, de reunião para 10 minutos. Pedir de novo
+ * exatamente o que ele já não cumpriu é pedir que ele confirme a própria
+ * falha; pedir menos dá a ele uma forma de voltar sem passar por isso.
+ */
+const RETOMADA_NO_SHOW_BLOCKS: string[] = [
+  `{{#primeiro_nome}}{{primeiro_nome}}, tudo bem?{{/primeiro_nome}}{{^primeiro_nome}}Olá, tudo bem?{{/primeiro_nome}}`,
+  `Apareceu uma informação nova aqui{{#categoria}} sobre {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} e lembrei de você.{{#concorrente}} Quem está aparecendo na frente nas buscas da região agora é {{concorrente}}.{{/concorrente}}`,
+  `O que isso significa na prática: quem pesquisa hoje e quem pergunta pra ChatGPT antes de escolher está sendo mandado pra lá. Não é questão de propaganda, é questão de quem o Google mostra primeiro.`,
+  `Você tem ideia de quanta gente procura por{{#categoria}} {{categoria}}{{/categoria}}{{^categoria}} esse serviço{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} todo mês?`,
+  `Esse número eu tenho aqui. São 10 minutos pra te mostrar, e eu me adapto ao seu horário. Funciona?${SIGNATURE}`,
+];
+
+/**
+ * Retomada de quem pediu para voltar depois (ver
+ * `retomada_depois_com_data`).
+ *
+ * Antes deste modelo o status `retornar_depois` não tinha nenhum template e
+ * caía em "Mensagem em branco", o que explica em parte os 9 leads parados
+ * nele com mediana de quase dois meses: o status existia, o texto não.
+ *
+ * O trabalho da mensagem é dar data ao "depois". Depois sem data é um não
+ * educado que ocupa lugar no funil indefinidamente, e o funil não distingue
+ * um do outro.
+ *
+ * O bloco 4 oferece o "não agora" de forma explícita, de propósito. Parece
+ * entregar a objeção de graça, mas faz o contrário: tira do lead a
+ * necessidade de inventar uma saída, e as duas respostas possíveis são
+ * úteis. "Agora" vira reunião; "janeiro" vira uma data real na agenda em
+ * vez de um card parado.
+ */
+const RETOMADA_DEPOIS_BLOCKS: string[] = [
+  `{{#primeiro_nome}}{{primeiro_nome}}, tudo bem?{{/primeiro_nome}}{{^primeiro_nome}}Olá, tudo bem?{{/primeiro_nome}}`,
+  `Você me pediu pra voltar mais pra frente, e eu demorei mais do que o combinado pra fazer isso.`,
+  `Estou voltando porque o cenário{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} mexeu desde então.{{#concorrente}} Quem aparece primeiro hoje é {{concorrente}}.{{/concorrente}} Quem entra nessa disputa mais tarde leva mais tempo pra subir, porque o espaço fica mais disputado, não menos.`,
+  `Então te pergunto direto, e qualquer resposta serve: faz sentido olhar isso agora, ou prefere que eu volte a te procurar em um mês ou dois? Se for pra voltar depois, me diz o mês e eu respeito, sem ficar te mandando mensagem no meio.`,
+  `Se for agora, são 20 minutos com a tela compartilhada, no horário que for melhor pra você.${SIGNATURE}`,
+];
+
 /**
  * Cadência específica pro canal "instagram" (leads com `source: "instagram"`,
  * ver TNG_PROSPECTING_SOURCES/ACTIVE_PROSPECTING_SOURCES em lib/types.ts e
@@ -662,9 +762,16 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
   {
     id: "diagnostico_enviado",
     label: "Cobrança do diagnóstico enviado (PDF)",
-    description: "Depois de enviar o relatório em PDF (fluxo à parte da cadência de 8 contatos), puxa pra marcar os 15 minutos de explicação.",
+    description:
+      "Depois de enviar o relatório em PDF (fluxo à parte da cadência de 8 contatos), puxa pra marcar os 15 minutos de explicação. Use enquanto o envio é recente: passadas duas semanas, 'conseguiu dar uma olhada?' cobra do lead um silêncio que foi nosso, e o modelo certo passa a ser a retomada (ver retomada_diagnostico_vencido).",
     appliesTo: ["diagnostico_enviado"],
-    channel: "ativo",
+    /* Era "ativo", e isso deixava o modelo inalcançável justamente para quem
+       mais recebe diagnóstico: dos 23 leads no status "diagnóstico enviado",
+       22 vêm do Trello, que é canal "pago". Para esses 22 o composer não
+       encontrava modelo nenhum e abria em "Mensagem em branco", ou seja, o
+       texto de cobrança existia escrito e nunca aparecia na tela de quem
+       precisava dele. */
+    channel: "ambos",
     text: withSignature(
       `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}conseguiu dar uma olhada no diagnóstico que te enviei? Ele mostra bem o cenário de {{#categoria}}{{categoria}}{{/categoria}}{{^categoria}}vocês{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} no Google hoje e onde dá pra melhorar. Posso separar uns 15 minutos pra te explicar os números com calma e mostrar como resolveríamos isso?`
     ),
@@ -721,6 +828,78 @@ Só não queria que isso te custasse a chance de ver o que encontramos: enquanto
 
 Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espaço hoje e o que dá pra fazer pra reverter isso ainda esse mês. Quer que eu te mande agora, ou prefere remarcar um horário rapidinho?`
     ),
+  },
+
+  // ---- Retomada depois de silêncio longo ------------------------------
+  //
+  // Por quê isso existe, e por quê é um grupo separado dos modelos acima:
+  // todos os modelos de reunião/diagnóstico/no-show deste arquivo foram
+  // escritos para o dia seguinte. "Conseguiu dar uma olhada no diagnóstico
+  // que te enviei?" é a pergunta certa no terceiro dia. No septuagésimo
+  // sétimo ela conta ao lead que a agência perdeu o controle da própria
+  // carteira, e ainda transfere pra ele a cobrança de uma demora que não
+  // foi dele.
+  //
+  // E esse é o estado real da base: 18 pessoas com reunião aceita, 23 com
+  // diagnóstico recebido, 15 que faltaram e 9 que pediram para voltar
+  // depois, com mediana de 76 dias de silêncio nas de diagnóstico. Não há
+  // nada entre "acabou de acontecer" e o canal de remarketing, que só
+  // alcança quem já foi dado como perdido (appliesTo: ["finalizado"]).
+  // Quem levantou a mão e foi esquecido no meio não tinha modelo nenhum.
+  //
+  // Três regras valem para os quatro textos abaixo:
+  //
+  // 1. Quem ficou calado foi a agência, então a mensagem não começa
+  //    cobrando o lead. Nenhuma delas pergunta "conseguiu ver?".
+  //
+  // 2. Não pede desculpa pela demora. "Desculpa o sumiço" informa ao lead
+  //    que ele foi despriorizado e convida ele a concordar. Assumir em uma
+  //    oração e seguir adiante devolve a conversa; explicar o motivo abre
+  //    um assunto que não ajuda em nada a fechar.
+  //
+  // 3. Traz um motivo real para a mensagem existir hoje. O motivo verdadeiro
+  //    é que posição muda: um levantamento de agosto não descreve novembro.
+  //    Isso é notícia, não desculpa, e notícia é o que faz uma mensagem
+  //    atrasada soar natural em vez de constrangida.
+  {
+    id: "retomada_reuniao_perdida",
+    label: "Retomada: reunião que não aconteceu",
+    description:
+      "Para reunião cuja data já passou e que nunca aconteceu (status continua 'reunião marcada'). Diferente do 'Lembrete de reunião', que pede confirmação de presença e, numa data vencida, pede confirmação de uma reunião que já não houve. Assume a falha de retomar em uma oração, traz o movimento do mercado desde então como motivo da mensagem, e oferece dois horários concretos em vez de perguntar 'quando você pode'.",
+    appliesTo: ["reuniao_marcada"],
+    channel: "ambos",
+    text: RETOMADA_REUNIAO_BLOCKS.join("\n\n"),
+    blocks: RETOMADA_REUNIAO_BLOCKS,
+  },
+  {
+    id: "retomada_diagnostico_vencido",
+    label: "Retomada: diagnóstico que esfriou",
+    description:
+      "Para quem recebeu o PDF há semanas e nunca teve retorno. Nunca pergunta se ele leu: a essa altura a pergunta cobra o lead por um silêncio que foi da agência. Usa a validade real do diagnóstico (posição de busca muda de mês para mês) como motivo legítimo de voltar, e oferece refazer a leitura com os números de hoje.",
+    appliesTo: ["diagnostico_enviado"],
+    channel: "ambos",
+    text: RETOMADA_DIAGNOSTICO_BLOCKS.join("\n\n"),
+    blocks: RETOMADA_DIAGNOSTICO_BLOCKS,
+  },
+  {
+    id: "retomada_no_show_antigo",
+    label: "Retomada: faltou há semanas",
+    description:
+      "Para quem faltou numa reunião há mais de duas semanas. Diferente do 'Resgate (não compareceu)', que cita a falta e funciona no dia seguinte: passadas semanas, nomear a ausência só produz vergonha e uma resposta defensiva, e o lead que se sente devendo explicação costuma não responder nada. Este não menciona a falta em nenhum momento, volta com informação nova e oferece um formato menor (10 minutos) do que o que ele já não cumpriu.",
+    appliesTo: ["no_show"],
+    channel: "ambos",
+    text: RETOMADA_NO_SHOW_BLOCKS.join("\n\n"),
+    blocks: RETOMADA_NO_SHOW_BLOCKS,
+  },
+  {
+    id: "retomada_depois_com_data",
+    label: "Retomada: o 'depois' virou agora",
+    description:
+      "Para quem pediu para voltar depois e nunca recebeu esse retorno (antes deste modelo o status 'retornar_depois' caía em mensagem em branco). Transforma o 'depois' em data, porque depois sem data é um não educado que ocupa lugar no funil por meses. Oferece explicitamente a saída do 'não agora', que reduz resistência e, quando o lead usa, libera a vaga em vez de deixar o card parado.",
+    appliesTo: ["retornar_depois"],
+    channel: "ambos",
+    text: RETOMADA_DEPOIS_BLOCKS.join("\n\n"),
+    blocks: RETOMADA_DEPOIS_BLOCKS,
   },
   {
     id: "break_off",
@@ -1069,22 +1248,95 @@ export function getTemplatesForChannel(channel: WhatsappChannel): WhatsappTempla
  * retrocompatível: sem ele, sempre cai no 1º = confirmação, igual ao
  * comportamento antigo) deixa a escolha automática seguir a proximidade real
  * da reunião (ver meetingUrgency em lib/types.ts), pra não deixar o lead
- * esfriar entre marcar e comparecer: "distante" ainda é só confirmação,
- * "proxima" vira o aquecimento de curiosidade, e "iminente"/"atrasada" já
- * pedem o lembrete com bônus (o mais eficaz contra no-show). */
+ * esfriar entre marcar e comparecer: "distante" é só confirmação, "proxima"
+ * vira o aquecimento de curiosidade, "iminente" pede o lembrete com bônus (o
+ * mais eficaz contra no-show) e "atrasada", que é data já vencida, puxa a
+ * retomada de reunião perdida em vez de pedir confirmação de uma reunião que
+ * já não aconteceu. */
+/** Dias desde o último movimento no lead (`lead.updated_at`). Devolve null
+ * quando não há data, pra quem chama poder manter o comportamento antigo em
+ * vez de assumir zero (assumir zero trataria lead parado há dois meses como
+ * lead mexido hoje, que é exatamente o erro que isso existe pra evitar). */
+function diasDeSilencio(lastTouchAt?: string | null, now: Date = new Date()): number | null {
+  if (!lastTouchAt) return null;
+  const t = new Date(lastTouchAt).getTime();
+  if (Number.isNaN(t)) return null;
+  return Math.floor((now.getTime() - t) / (1000 * 60 * 60 * 24));
+}
+
+/** A partir de quantos dias de silêncio a mensagem de "aconteceu agora" passa
+ * a soar como descuido e o modelo de retomada vira o certo. Duas semanas é o
+ * ponto em que "não consegui falar com você no horário combinado" deixa de
+ * ser um comentário sobre hoje e passa a ser a confissão de que ninguém
+ * olhou o funil desde então. */
+const DIAS_PARA_RETOMADA = 14;
+
 export function defaultTemplateIdForStatus(
   status: LeadStatus,
   channel: WhatsappChannel,
   meetingDatetime?: string | null,
-  remarketingStage?: RemarketingStage | null
+  remarketingStage?: RemarketingStage | null,
+  lastTouchAt?: string | null
 ): string {
   const templates = getTemplatesForChannel(channel);
   const matches = templates.filter((t) => t.appliesTo.includes(status));
   if (matches.length === 0) return "personalizada";
+
+  const silencio = diasDeSilencio(lastTouchAt);
+  const esfriou = silencio !== null && silencio >= DIAS_PARA_RETOMADA;
+  const temModelo = (id: string) => matches.some((t) => t.id === id);
+
+  /* Faltou à reunião há semanas não é o mesmo problema de faltou ontem.
+     `no_show_resgate` cita a ausência, o que é natural no dia seguinte e
+     vira cobrança passadas semanas. E a data da reunião não serve de
+     critério aqui: dos 15 no-shows da base, 13 estão sem `meeting_datetime`,
+     porque o status foi arrastado no Trello sem ninguém preencher a data.
+     Por isso o critério é o silêncio, que existe em todo lead. */
+  if (status === "no_show" && esfriou && temModelo("retomada_no_show_antigo")) {
+    return "retomada_no_show_antigo";
+  }
+
+  /* Diagnóstico recém-enviado ainda pede a cobrança normal: dizer "o
+     diagnóstico que te mandei venceu" três dias depois de mandar desfaz o
+     próprio trabalho. A retomada só entra quando o envio de fato esfriou. */
+  if (status === "diagnostico_enviado" && !esfriou && temModelo("diagnostico_enviado")) {
+    return "diagnostico_enviado";
+  }
+  if (status === "diagnostico_enviado" && esfriou && temModelo("retomada_diagnostico_vencido")) {
+    return "retomada_diagnostico_vencido";
+  }
+
+  /* Reunião marcada e sem data cadastrada: `meetingUrgency` devolve null e a
+     regra de urgência abaixo não decide nada, então o default caía na
+     confirmação ("tudo certo pra nossa conversa!") mesmo em lead parado há
+     dois meses. Com silêncio longo e sem data, a retomada é o texto honesto. */
+  if (status === "reuniao_marcada" && !meetingDatetime && esfriou && temModelo("retomada_reuniao_perdida")) {
+    return "retomada_reuniao_perdida";
+  }
   if (status === "reuniao_marcada" && matches.length > 1) {
     const urgency = meetingUrgency(meetingDatetime ?? null);
-    if (urgency === "proxima") return matches[1].id;
-    if (urgency === "iminente" || urgency === "atrasada") return matches[matches.length - 1].id;
+    /* Escolha por id, nunca por posição no array.
+     *
+     * A regra anterior lia `matches[1]` e `matches[matches.length - 1]`, o
+     * que amarrava o comportamento à ordem de cadastro dos modelos: incluir
+     * um quarto modelo de reunião mudava, sem erro nenhum, qual mensagem o
+     * composer sugeria. Foi o que ia acontecer ao entrar
+     * "retomada_reuniao_perdida" no array: uma reunião marcada pra daqui a
+     * duas horas passaria a sugerir o texto de reunião perdida.
+     *
+     * E a linha de "atrasada" era um problema por si. Reunião com data
+     * vencida caía no lembrete de véspera, que pede confirmação de presença.
+     * Numa base com 13 reuniões aceitas e não realizadas, com datas de 23/09
+     * a 12/11, isso significa abrir o WhatsApp e oferecer ao lead um
+     * "confirma presença pra 23/09?" em novembro, que avisa a ele que
+     * ninguém acompanhou a agenda. Data vencida agora puxa a retomada. */
+    const porUrgencia: Record<string, string> = {
+      proxima: "curiosidade_reuniao",
+      iminente: "lembrete_reuniao",
+      atrasada: "retomada_reuniao_perdida",
+    };
+    const escolhido = urgency ? porUrgencia[urgency] : undefined;
+    if (escolhido && matches.some((t) => t.id === escolhido)) return escolhido;
   }
   // Canal "remarketing": os 3 modelos (ver REMARKETING_*_TEXT acima) têm a
   // mesma ordem de REMARKETING_STAGE_ORDER (lib/types.ts) — `remarketingStage`

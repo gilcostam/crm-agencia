@@ -73,7 +73,7 @@ function nextMessageLabelForLead(lead: Lead): string | null {
         : lead.instagram
           ? "instagram"
           : whatsappChannelForSource(lead.source);
-  const templateId = defaultTemplateIdForStatus(lead.status, channel, lead.meeting_datetime);
+  const templateId = defaultTemplateIdForStatus(lead.status, channel, lead.meeting_datetime, null, lead.updated_at);
   if (templateId === "personalizada") return null;
   return getTemplate(templateId).label;
 }

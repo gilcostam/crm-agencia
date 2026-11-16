@@ -91,7 +91,7 @@ export default function InstagramComposerModal({
   // forçam um valor só pra essa mensagem.
   const [titleOverride, setTitleOverride] = useState<"auto" | "Dr." | "Dra." | "nenhum">("auto");
   const [templateId, setTemplateId] = useState(() =>
-    defaultTemplateIdForStatus(lead.status, channel, lead.meeting_datetime, lead.remarketing_stage)
+    defaultTemplateIdForStatus(lead.status, channel, lead.meeting_datetime, lead.remarketing_stage, lead.updated_at)
   );
   const [blockTexts, setBlockTexts] = useState<string[]>([]);
   const [blockDirty, setBlockDirty] = useState<boolean[]>([]);
