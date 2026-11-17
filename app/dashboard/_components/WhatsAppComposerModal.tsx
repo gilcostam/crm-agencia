@@ -61,6 +61,22 @@ function formatCompetitorsForMessage(
  * chegam, então pra eles o composer sugere direto o modelo de diagnóstico
  * (2º contato) em vez de uma "primeira abordagem" do zero.
  */
+/** `true` quando a reunião marcada cai no dia de hoje, no fuso de quem está
+ * usando o CRM. Alimenta a bandeira `reuniao_hoje` dos lembretes: numa
+ * reunião de hoje, prometer a análise "da véspera" é uma frase falsa, e o
+ * convite a remarcar "pro dia novo" é o contrário do que se quer. */
+function reuniaoEhHoje(meetingDatetime: string | null): boolean {
+  if (!meetingDatetime) return false;
+  const d = new Date(meetingDatetime);
+  if (Number.isNaN(d.getTime())) return false;
+  const hoje = new Date();
+  return (
+    d.getFullYear() === hoje.getFullYear() &&
+    d.getMonth() === hoje.getMonth() &&
+    d.getDate() === hoje.getDate()
+  );
+}
+
 export default function WhatsAppComposerModal({
   lead,
   onClose,
@@ -287,6 +303,11 @@ export default function WhatsAppComposerModal({
             lead.meeting_datetime,
             channel === "internacional" && language === "en" ? "en-US" : "pt-BR"
           ),
+          /* Bandeira silenciosa que troca a frase da "véspera" nos lembretes
+             quando a reunião é hoje (ver `reuniao_hoje` em
+             lib/whatsapp-templates.ts). Comparação em data local, não em UTC:
+             o que importa é o dia do calendário de quem lê a mensagem. */
+          reuniao_hoje: reuniaoEhHoje(lead.meeting_datetime) ? "sim" : null,
           titulo_override:
             titleOverride === "auto" ? undefined : titleOverride === "nenhum" ? "" : titleOverride,
           ...extraValues,

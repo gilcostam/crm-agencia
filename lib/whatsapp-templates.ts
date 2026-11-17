@@ -75,6 +75,19 @@ export interface WhatsappTemplateVars {
   /** Mesma lógica de `tem_perfil`, mas pra presença de site (ver
    * hasWebsite em lib/serper.ts). */
   tem_site?: string | null;
+  /** Bandeira "sim"/ausente (nunca exibida como texto) que diz se a reunião
+   * marcada é HOJE. Preenchida automaticamente pelo composer a partir de
+   * `meeting_datetime`, nunca digitada.
+   *
+   * Existe porque os lembretes de reunião prometem "eu rodo a análise na
+   * véspera" como motivo de não remarcar em cima da hora — frase que fica
+   * falsa, e constrangedora, numa reunião marcada pra hoje à tarde (o mesmo
+   * texto ainda convidava a remarcar "pro dia novo", o oposto do que se
+   * quer numa conversa que acontece em três horas). Marcar reunião pra logo
+   * é a jogada certa: quanto menos tempo entre o sim e a conversa, menos
+   * tempo o lead tem pra esfriar. Então quem muda é a mensagem, não a
+   * agenda. */
+  reuniao_hoje?: string | null;
   /** Observação livre sobre o perfil de Instagram do lead (ex.: "feed bonito
    * mas bio sem link", "poucas fotos recentes"), digitada à mão pelo vendedor
    * depois de olhar o perfil (ver InstagramComposerModal.tsx). Só usada nos
@@ -109,6 +122,7 @@ const FIELD_LABELS: Record<VarKey, string> = {
   avaliacoes_concorrente: "nº de avaliações do concorrente",
   tem_perfil: "se o lead tem perfil no Google",
   tem_site: "se o lead tem site",
+  reuniao_hoje: "se a reunião é hoje",
   nota_perfil: "observação sobre o perfil do Instagram",
   caso_real: "caso de sucesso real (resultado verificado)",
   link_agenda: "link de agendamento (opcional)",
@@ -119,7 +133,7 @@ const FIELD_LABELS: Record<VarKey, string> = {
  * válido e esperado (ex.: lead realmente não tem site) e não deve disparar
  * o aviso de "faltou preencher" do composer, por isso ficam de fora do
  * cálculo de `missing` em `renderWhatsappTemplate`. */
-const SILENT_FLAG_KEYS = new Set<VarKey>(["tem_perfil", "tem_site"]);
+const SILENT_FLAG_KEYS = new Set<VarKey>(["tem_perfil", "tem_site", "reuniao_hoje"]);
 
 export function fieldLabel(field: string): string {
   return FIELD_LABELS[field as VarKey] ?? field;
@@ -445,7 +459,7 @@ const INSTAGRAM_REUNIAO_MARCADA_TEXT =
   `Combinado{{#reuniao}} pra {{reuniao}}{{/reuniao}}! Vou te mostrar ao vivo o diagnóstico completo{{#categoria}} de {{categoria}}{{/categoria}} e como crescer no Google além do Instagram. Até lá!`;
 
 const INSTAGRAM_LEMBRETE_REUNIAO_TEXT =
-  `Lembrete rápido: nossa conversa é{{#reuniao}} {{reuniao}}{{/reuniao}}. Confirma pra mim? Pergunto porque eu rodo a análise na véspera, então o que eu te mostro é a sua posição de agora, não a do mês passado.`;
+  `Lembrete rápido: nossa conversa é{{#reuniao}} {{reuniao}}{{/reuniao}}. Confirma pra mim? {{#reuniao_hoje}}Pergunto porque estou rodando a análise agora, então o que eu te mostro é a sua posição de hoje, não a do mês passado.{{/reuniao_hoje}}{{^reuniao_hoje}}Pergunto porque eu rodo a análise na véspera, então o que eu te mostro é a sua posição de agora, não a do mês passado.{{/reuniao_hoje}}`;
 
 const INSTAGRAM_CURIOSIDADE_REUNIAO_TEXT =
   `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}enquanto isso já fui adiantando algo aqui: achei um ponto específico{{#categoria}} de {{categoria}}{{/categoria}} no Google que pretendo te mostrar na nossa conversa{{#reuniao}} de {{reuniao}}{{/reuniao}}. Não é nada que dá pra resolver só com Instagram. Vale muito a pena reservar esse horário 👀`;
@@ -515,7 +529,7 @@ const INTL_REUNIAO_MARCADA_TEXT =
   `We're set{{#reuniao}} for {{reuniao}}{{/reuniao}}! I'll walk you through the full report live{{#categoria}} for your {{categoria}} business{{/categoria}} and show you exactly how to grow on Google and AI search. Talk soon!`;
 
 const INTL_LEMBRETE_REUNIAO_TEXT =
-  `Quick reminder: our call is{{#reuniao}} {{reuniao}}{{/reuniao}}. Can you confirm? I run the analysis the day before, so what you see is where you stand right now, not last month.`;
+  `Quick reminder: our call is{{#reuniao}} {{reuniao}}{{/reuniao}}. Can you confirm? {{#reuniao_hoje}}I'm running the analysis right now, so what you see is where you stand today, not last month.{{/reuniao_hoje}}{{^reuniao_hoje}}I run the analysis the day before, so what you see is where you stand right now, not last month.{{/reuniao_hoje}}`;
 
 const INTL_CURIOSIDADE_REUNIAO_TEXT =
   `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}quick heads-up before our call{{#reuniao}} on {{reuniao}}{{/reuniao}}: I found something specific{{#categoria}} about your {{categoria}} business{{/categoria}} online that I want to walk you through live, it's costing you customers right now without you knowing. Worth clearing your calendar for this one.`;
@@ -567,7 +581,7 @@ const INTL_PT_REUNIAO_MARCADA_TEXT =
   `Combinado{{#reuniao}} pra {{reuniao}}{{/reuniao}}! Vou te mostrar o relatório completo ao vivo{{#categoria}} do seu negócio de {{categoria}}{{/categoria}} e exatamente como crescer no Google e nas buscas com IA. Até lá!`;
 
 const INTL_PT_LEMBRETE_REUNIAO_TEXT =
-  `Lembrete rápido: nossa conversa é{{#reuniao}} {{reuniao}}{{/reuniao}}. Confirma pra mim? Eu rodo a análise na véspera, então o que eu te mostro é a sua posição de agora, não a do mês passado.`;
+  `Lembrete rápido: nossa conversa é{{#reuniao}} {{reuniao}}{{/reuniao}}. Confirma pra mim? {{#reuniao_hoje}}Estou rodando a análise agora, então o que eu te mostro é a sua posição de hoje, não a do mês passado.{{/reuniao_hoje}}{{^reuniao_hoje}}Eu rodo a análise na véspera, então o que eu te mostro é a sua posição de agora, não a do mês passado.{{/reuniao_hoje}}`;
 
 const INTL_PT_CURIOSIDADE_REUNIAO_TEXT =
   `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}um aviso rápido antes da nossa conversa{{#reuniao}} de {{reuniao}}{{/reuniao}}: encontrei algo bem específico{{#categoria}} sobre o seu negócio de {{categoria}}{{/categoria}} que quero te mostrar ao vivo, está te custando cliente agora mesmo sem você saber. Vale muito a pena reservar esse horário.`;
@@ -847,13 +861,13 @@ Em breve entraremos em contato para apresentar o diagnóstico completo de visibi
     id: "lembrete_reuniao",
     label: "Lembrete de reunião (confirmação)",
     description:
-      "Lembrete pra mandar perto da data marcada (véspera ou no dia). Pede a confirmação na segunda linha, antes de qualquer outra coisa, porque é a única coisa que precisa de resposta. Não promete bônus: o motivo de comparecer é a própria análise, e ela é rodada na véspera.",
+      "Lembrete pra mandar perto da data marcada (véspera ou no próprio dia). Pede a confirmação na segunda linha, antes de qualquer outra coisa, porque é a única coisa que precisa de resposta. Não promete bônus: o motivo de comparecer é a própria análise. Se a reunião for hoje, o texto se ajusta sozinho e fala de análise rodada agora, sem convidar a remarcar (ver `reuniao_hoje`).",
     appliesTo: ["reuniao_marcada"],
     channel: "ambos",
     text: withSignature(
       `{{#primeiro_nome}}{{primeiro_nome}}, {{/primeiro_nome}}passando pra lembrar da nossa conversa{{#reuniao}} de {{reuniao}}{{/reuniao}}. Confirma pra mim?
 
-Pergunto porque eu rodo a análise{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} na véspera, pra te mostrar como está a sua posição agora e não a do mês passado. Se precisar remarcar, sem problema nenhum: é só me avisar hoje que eu rodo de novo pro dia novo.
+{{#reuniao_hoje}}Pergunto porque eu estou rodando a análise{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} agora, pra te mostrar a sua posição de hoje e não a do mês passado. Se não der mais hoje, me avisa que eu guardo a análise e a gente marca outro horário.{{/reuniao_hoje}}{{^reuniao_hoje}}Pergunto porque eu rodo a análise{{#categoria}} de {{categoria}}{{/categoria}}{{#cidade}} em {{cidade}}{{/cidade}} na véspera, pra te mostrar como está a sua posição agora e não a do mês passado. Se precisar remarcar, sem problema nenhum: é só me avisar hoje que eu rodo de novo pro dia novo.{{/reuniao_hoje}}
 
 No horário eu abro a tela e a gente olha junto: quem está aparecendo na frente na sua região, o que eles têm que você não tem, e o que dá pra corrigir primeiro.`
     ),
@@ -1076,7 +1090,7 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
   {
     id: "instagram_lembrete_reuniao",
     label: "Lembrete de reunião (confirmação)",
-    description: "Lembrete pra mandar perto da data marcada, em versão curta: pede a confirmação e usa a análise rodada na véspera como motivo de não remarcar em cima da hora.",
+    description: "Lembrete pra mandar perto da data marcada, em versão curta: pede a confirmação e usa a análise como motivo de não remarcar em cima da hora. Se a reunião for hoje, a frase troca de rodar na véspera pra rodar agora (ver `reuniao_hoje`).",
     appliesTo: ["reuniao_marcada"],
     channel: "instagram",
     text: INSTAGRAM_LEMBRETE_REUNIAO_TEXT,
@@ -1212,7 +1226,7 @@ Separei um resumo rápido mostrando exatamente onde vocês estão perdendo espa�
   {
     id: "intl_lembrete_reuniao",
     label: "Meeting reminder (confirmation)",
-    description: "Lembrete pra mandar perto da data marcada, em versão curta: pede a confirmação e usa a análise rodada na véspera como motivo de não remarcar em cima da hora.",
+    description: "Lembrete pra mandar perto da data marcada, em versão curta: pede a confirmação e usa a análise como motivo de não remarcar em cima da hora. Se a reunião for hoje, a frase troca de rodar na véspera pra rodar agora (ver `reuniao_hoje`).",
     appliesTo: ["reuniao_marcada"],
     channel: "internacional",
     text: INTL_LEMBRETE_REUNIAO_TEXT,
@@ -1656,6 +1670,28 @@ function inferGenderTitle(fullName: string): "Dr." | "Dra." | null {
   return normalized.endsWith("a") ? "Dra." : "Dr.";
 }
 
+/** Separa um título que já venha escrito no próprio nome do lead ("Dra Sonia
+ * | Dentista | Perdizes", "Dr. Pedro Carlos") do resto do nome.
+ *
+ * Existe por causa de um defeito encontrado em 17/11/2026: muitos nomes na
+ * base vêm do Google Meu Negócio com o título embutido, e o título
+ * automático era somado em cima dele, então a mensagem abria com "Dra. Dra,"
+ * ou "Dr. Dr.," — erro visível pro lead, na primeira palavra, justamente nos
+ * leads de saúde, que são a maioria da carteira. Quando o nome já traz o
+ * título, ele é o título (ninguém acerta melhor o gênero do que a própria
+ * pessoa ao se apresentar) e sai do nome pra não se repetir. */
+export function separarTitulo(fullName: string): {
+  titulo: "Dr." | "Dra." | null;
+  resto: string;
+} {
+  const limpo = fullName.trim();
+  const m = limpo.match(/^(dr|dra|dr\.|dra\.|doutor|doutora)\s+(.*)$/i);
+  if (!m || !m[2].trim()) return { titulo: null, resto: limpo };
+  const bruto = m[1].toLowerCase().replace(".", "");
+  const titulo = bruto === "dra" || bruto === "doutora" ? "Dra." : "Dr.";
+  return { titulo, resto: m[2].trim() };
+}
+
 /** Título automático (`Dr.`/`Dra.`) pra prefixar `nome`/`primeiro_nome` em
  * `buildTemplateVars` — só quando a categoria do lead sugere profissão
  * liberal/saúde (ver `isTitleEligibleCategory`); fora disso, `null` (sem
@@ -1681,11 +1717,14 @@ export function buildTemplateVars(
     titulo_override?: "Dr." | "Dra." | "" | null;
   } = {}
 ): WhatsappTemplateVars {
-  const fullName = lead.full_name?.trim() || "";
+  const nomeBruto = lead.full_name?.trim() || "";
+  /* Se o nome já traz o título, ele sai daqui pra não ser somado duas vezes
+     (ver separarTitulo) e vale mais que o palpite automático. */
+  const { titulo: tituloNoNome, resto: fullName } = separarTitulo(nomeBruto);
   const title =
     extras.titulo_override !== undefined && extras.titulo_override !== null
       ? extras.titulo_override || null
-      : autoTitleForLead(fullName, lead.category);
+      : (tituloNoNome ?? autoTitleForLead(fullName, lead.category));
   const firstName = fullName ? fullName.split(" ")[0] : "";
   return {
     nome: fullName ? (title ? `${title} ${fullName}` : fullName) : null,
@@ -1701,5 +1740,6 @@ export function buildTemplateVars(
     tem_perfil: extras.tem_perfil?.trim() || null,
     tem_site: extras.tem_site?.trim() || null,
     nota_perfil: extras.nota_perfil?.trim() || null,
+    reuniao_hoje: extras.reuniao_hoje?.trim() || null,
   };
 }
