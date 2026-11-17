@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 const NAV_ITEMS = [
+  { href: "/dashboard/fila", label: "Fila do Dia", icon: FilaIcon },
   { href: "/dashboard", label: "Leads", icon: LeadsIcon },
   { href: "/dashboard/reunioes", label: "Reuniões Marcadas", icon: MeetingIcon },
   { href: "/dashboard/remarketing", label: "Remarketing", icon: RemarketingIcon },
@@ -16,6 +17,17 @@ const NAV_ITEMS = [
   { href: "/dashboard/propostas", label: "Propostas", icon: ProposalsIcon },
   { href: "/dashboard/metricas", label: "Métricas", icon: MetricsIcon },
 ];
+
+function FilaIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      <path d="M8 5h9M8 10h9M8 15h9" strokeLinecap="round" />
+      <path d="M3 4.2h1.6V7M3 7h3.2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="4.1" cy="10" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="4.1" cy="15" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
 
 function LeadsIcon() {
   return (
