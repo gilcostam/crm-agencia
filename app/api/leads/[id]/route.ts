@@ -48,6 +48,7 @@ export async function PATCH(
     outreach_language,
     remarketing_stage,
     confirmar_sem_contato,
+    confirmar_sem_data,
   } = body as {
     status?: string;
     notes?: string;
@@ -61,6 +62,8 @@ export async function PATCH(
     remarketing_stage?: RemarketingStage | null;
     /** Ver a travessa de perda sem contato mais abaixo. */
     confirmar_sem_contato?: boolean;
+    /** Ver a travessa de reuniao sem data mais abaixo. */
+    confirmar_sem_data?: boolean;
   };
 
   const update: {
@@ -190,6 +193,45 @@ export async function PATCH(
     );
   }
 
+  /* Travessa: entrar em "Reunião Marcada" sem data e hora.
+   *
+   * Medido em 17/11/2026: 20 das 25 reuniões da base não têm
+   * `meeting_datetime`, e dos 15 no-shows, 13 estão sem data. Sem a data o
+   * CRM fica cego exatamente onde ele mais serve: a Fila do Dia não sabe
+   * que existe reunião hoje, o lembrete não sabe se é véspera ou mesmo dia,
+   * e o aviso de confirmação nunca dispara. E confirmação é a única coisa
+   * medida que separa 18% de no-show de 58%.
+   *
+   * Vale só pra ENTRADA no status. Quem já está em "Reunião Marcada" sem
+   * data (os 20 de hoje) não é barrado a cada edição: esses aparecem na
+   * coluna "Sem data" do quadro de Reuniões, que é onde se arruma. E
+   * remover a data pela ficha do lead continua livre, porque ali é um ato
+   * deliberado com o campo na frente, não um card arrastado sem perceber.
+   *
+   * Como a travessa de perda: não bloqueia, pede. Marcar reunião sem hora
+   * combinada acontece ("ele aceitou, vamos ver o dia"), então existe a
+   * saída de salvar sem data, e ela fica registrada no histórico. */
+  const virandoReuniao =
+    status !== undefined &&
+    before &&
+    status === "reuniao_marcada" &&
+    before.status !== "reuniao_marcada";
+
+  const dataFinalDaReuniao =
+    meeting_datetime !== undefined ? meeting_datetime : (before?.meeting_datetime ?? null);
+
+  const reuniaoSemData = Boolean(virandoReuniao) && !dataFinalDaReuniao;
+
+  if (reuniaoSemData && !confirmar_sem_data) {
+    return NextResponse.json(
+      {
+        error: "Reunião marcada sem data e hora.",
+        code: "reuniao_sem_data",
+      },
+      { status: 409 }
+    );
+  }
+
   // Se o status está mudando de verdade, registra a data dessa transição em
   // `status_dates` e (a não ser que o pedido já tenha informado
   // `next_followup` explicitamente) agenda/limpa o próximo follow-up
@@ -233,6 +275,15 @@ export async function PATCH(
           lead_id: id,
           type: "note",
           message: `Dado como "${toLabel}" sem nenhum contato registrado no histórico (confirmado manualmente)`,
+        });
+      }
+
+      if (reuniaoSemData) {
+        events.push({
+          lead_id: id,
+          type: "note",
+          message:
+            "Reunião marcada sem data e hora definidas (confirmado manualmente)",
         });
       }
 

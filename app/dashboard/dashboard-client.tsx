@@ -1232,6 +1232,17 @@ export default function DashboardClient({
     leadName: string;
     status: LeadStatus;
   } | null>(null);
+
+  /** Lead que a usuária tentou mover para "Reunião Marcada" sem data e hora
+   * — a pergunta fica pendente aqui até ela preencher ou dispensar (ver
+   * updateStatus e a travessa em app/api/leads/[id]/route.ts). */
+  const [reuniaoSemData, setReuniaoSemData] = useState<{
+    leadId: string;
+    leadName: string;
+    status: LeadStatus;
+  } | null>(null);
+  /** Valor do campo datetime-local da pergunta acima. */
+  const [dataReuniaoInput, setDataReuniaoInput] = useState("");
   const [instagramComposerLeadId, setInstagramComposerLeadId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
@@ -1534,29 +1545,71 @@ export default function DashboardClient({
     }
   }
 
-  async function updateStatus(id: string, status: LeadStatus, confirmarSemContato = false) {
+  /** Muda o status de um lead.
+   *
+   * `extra` leva as confirmações das travessas do backend (ver
+   * app/api/leads/[id]/route.ts). O desenho é sempre o mesmo: o backend
+   * devolve 409, a mudança é desfeita na tela e volta como pergunta, e a
+   * resposta dela reenvia a MESMA mudança com a confirmação em anexo. */
+  async function updateStatus(
+    id: string,
+    status: LeadStatus,
+    extra?: {
+      confirmar_sem_contato?: boolean;
+      confirmar_sem_data?: boolean;
+      meeting_datetime?: string | null;
+    }
+  ) {
     const previousLead = leads.find((l) => l.id === id);
-    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
+    setLeads((prev) =>
+      prev.map((l) =>
+        l.id === id
+          ? {
+              ...l,
+              status,
+              ...(extra?.meeting_datetime !== undefined
+                ? { meeting_datetime: extra.meeting_datetime }
+                : {}),
+            }
+          : l
+      )
+    );
     const res = await fetch(`/api/leads/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(
-        confirmarSemContato ? { status, confirmar_sem_contato: true } : { status }
-      ),
+      body: JSON.stringify({ status, ...extra }),
     });
     const data = await res.json().catch(() => ({}));
+
+    /** Devolve o lead ao estado anterior inteiro, e não só ao status: a
+     * mudança otimista pode ter mexido na data da reunião também. */
+    const desfazerNaTela = () => {
+      if (previousLead) {
+        setLeads((prev) => prev.map((l) => (l.id === id ? previousLead : l)));
+      }
+    };
 
     /* O backend recusa dar um lead como perdido quando ele nunca recebeu um
      * contato registrado (ver a travessa em app/api/leads/[id]/route.ts).
      * Aqui desfazemos o arrasto otimista e abrimos a confirmação, que é o
      * ponto todo: a perda sem contato pode acontecer, mas não em silêncio. */
     if (res.status === 409 && data?.code === "perda_sem_contato") {
-      if (previousLead) {
-        setLeads((prev) =>
-          prev.map((l) => (l.id === id ? { ...l, status: previousLead.status } : l))
-        );
-      }
+      desfazerNaTela();
       setPerdaSemContato({
+        leadId: id,
+        leadName: previousLead?.full_name || "este lead",
+        status,
+      });
+      return;
+    }
+
+    /* Mesma ideia ao entrar em "Reunião Marcada" sem data e hora: aqui a
+     * pergunta já vem com o campo da data, porque na maioria das vezes a
+     * resposta certa não é confirmar, é preencher. */
+    if (res.status === 409 && data?.code === "reuniao_sem_data") {
+      desfazerNaTela();
+      setDataReuniaoInput("");
+      setReuniaoSemData({
         leadId: id,
         leadName: previousLead?.full_name || "este lead",
         status,
@@ -2765,11 +2818,74 @@ export default function DashboardClient({
                   onClick={() => {
                     const { leadId, status } = perdaSemContato;
                     setPerdaSemContato(null);
-                    updateStatus(leadId, status, true);
+                    updateStatus(leadId, status, { confirmar_sem_contato: true });
                   }}
                   className="flex-1 rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
                 >
                   Perder mesmo assim
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmação de reunião marcada sem data e hora. Diferente da
+          travessa de perda, aqui o caminho principal não é confirmar, é
+          preencher: o campo já vem aberto e com o foco, e salvar sem data é
+          a saída secundária. */}
+      {reuniaoSemData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+            <h3 className="text-base font-semibold text-neutral-900">
+              Quando é a reunião com {reuniaoSemData.leadName}?
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-600">
+              Sem data e hora, esta reunião não aparece na Fila do Dia, o lembrete
+              não sabe se é véspera ou mesmo dia, e o aviso de confirmação não
+              dispara.
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-600">
+              Na base, das reuniões que receberam confirmação 18% viraram no-show.
+              Das que não receberam, 58%.
+            </p>
+            <input
+              type="datetime-local"
+              autoFocus
+              value={dataReuniaoInput}
+              onChange={(e) => setDataReuniaoInput(e.target.value)}
+              className="mt-4 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus:border-neutral-900 focus:outline-none"
+            />
+            <div className="mt-5 flex flex-col gap-2">
+              <button
+                disabled={!dataReuniaoInput}
+                onClick={() => {
+                  const { leadId, status } = reuniaoSemData;
+                  setReuniaoSemData(null);
+                  updateStatus(leadId, status, {
+                    meeting_datetime: new Date(dataReuniaoInput).toISOString(),
+                  });
+                }}
+                className="w-full rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Marcar reunião nesta data
+              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setReuniaoSemData(null)}
+                  className="flex-1 rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                >
+                  Deixar como está
+                </button>
+                <button
+                  onClick={() => {
+                    const { leadId, status } = reuniaoSemData;
+                    setReuniaoSemData(null);
+                    updateStatus(leadId, status, { confirmar_sem_data: true });
+                  }}
+                  className="flex-1 rounded-md border border-amber-300 px-4 py-2 text-sm font-medium text-amber-700 hover:bg-amber-50"
+                >
+                  Ainda não tem data
                 </button>
               </div>
             </div>
