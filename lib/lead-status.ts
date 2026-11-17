@@ -98,3 +98,45 @@ export function buildStatusChangeUpdate(
 
   return update;
 }
+
+/** Status que provam que o lead já recebeu algum contato nosso — qualquer um
+ * deles em `status_dates` significa que alguém já falou com ele (ou pelo
+ * menos tentou e registrou). Não inclui "novo_lead" (é só a chegada) nem
+ * "finalizado"/"desqualificado"/"retornar_depois" (são saídas: entrar neles
+ * não é contato).
+ *
+ * Existe por causa de um número medido em 17/11/2026: dos 487 leads perdidos
+ * da base, 215 (44%) não tinham NENHUM destes status no histórico, ou seja,
+ * foram dados como perdidos sem terem recebido uma mensagem. 201 dos 215
+ * vinham do Trello — o único canal que já gerou contrato — e todos os 215
+ * tinham telefone. A perda não era rejeição do lead, era desistência nossa,
+ * e o CRM não dizia nada na hora de arrastar o card. */
+export const CONTACT_PROOF_STATUSES: LeadStatus[] = [
+  "primeiro_contato",
+  "segundo_contato",
+  "terceiro_contato",
+  "quarto_contato",
+  "quinto_contato",
+  "sexto_contato",
+  "setimo_contato",
+  "reuniao_marcada",
+  "no_show",
+  "diagnostico_enviado",
+  "contrato_assinado",
+];
+
+/** Status de perda: o lead sai do funil sem ter fechado. */
+export const LOSS_STATUSES: LeadStatus[] = ["finalizado", "desqualificado"];
+
+/** `true` quando o histórico do lead não tem nenhuma prova de contato (ver
+ * CONTACT_PROOF_STATUSES). Usado pra pedir confirmação antes de dar o lead
+ * como perdido, e pra montar a fila do dia.
+ *
+ * Importante: "nunca contatado" aqui é sempre uma afirmação sobre o que o
+ * CRM registrou, não sobre o mundo. Leads muito antigos podem ter sido
+ * trabalhados por fora (o Trello era o quadro real) e chegado aqui já com o
+ * estado final — por isso a travessa pede confirmação em vez de bloquear. */
+export function nuncaFoiContatado(statusDates: unknown): boolean {
+  const sd = normalizeStatusDates(statusDates);
+  return !CONTACT_PROOF_STATUSES.some((s) => sd[s]);
+}

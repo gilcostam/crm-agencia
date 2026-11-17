@@ -1223,6 +1223,15 @@ export default function DashboardClient({
   const [flashIds, setFlashIds] = useState<Set<string>>(new Set());
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [composerLeadId, setComposerLeadId] = useState<string | null>(null);
+
+  /** Lead que a usuária tentou dar como perdido sem nenhum contato
+   * registrado — a confirmação fica pendente aqui até ela decidir (ver
+   * updateStatus e a travessa em app/api/leads/[id]/route.ts). */
+  const [perdaSemContato, setPerdaSemContato] = useState<{
+    leadId: string;
+    leadName: string;
+    status: LeadStatus;
+  } | null>(null);
   const [instagramComposerLeadId, setInstagramComposerLeadId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
@@ -1525,15 +1534,35 @@ export default function DashboardClient({
     }
   }
 
-  async function updateStatus(id: string, status: LeadStatus) {
+  async function updateStatus(id: string, status: LeadStatus, confirmarSemContato = false) {
     const previousLead = leads.find((l) => l.id === id);
     setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, status } : l)));
     const res = await fetch(`/api/leads/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
+      body: JSON.stringify(
+        confirmarSemContato ? { status, confirmar_sem_contato: true } : { status }
+      ),
     });
     const data = await res.json().catch(() => ({}));
+
+    /* O backend recusa dar um lead como perdido quando ele nunca recebeu um
+     * contato registrado (ver a travessa em app/api/leads/[id]/route.ts).
+     * Aqui desfazemos o arrasto otimista e abrimos a confirmação, que é o
+     * ponto todo: a perda sem contato pode acontecer, mas não em silêncio. */
+    if (res.status === 409 && data?.code === "perda_sem_contato") {
+      if (previousLead) {
+        setLeads((prev) =>
+          prev.map((l) => (l.id === id ? { ...l, status: previousLead.status } : l))
+        );
+      }
+      setPerdaSemContato({
+        leadId: id,
+        leadName: previousLead?.full_name || "este lead",
+        status,
+      });
+      return;
+    }
 
     // Ao entrar em "Contrato Assinado", o backend converte o lead em cliente
     // automaticamente (ver app/api/leads/[id]/route.ts) — aqui só exibimos o
@@ -2691,6 +2720,61 @@ export default function DashboardClient({
 
       {composerLead && (
         <WhatsAppComposerModal lead={composerLead} onClose={() => setComposerLeadId(null)} />
+      )}
+
+      {/* Confirmação de perda sem contato. Oferece as duas saídas de verdade:
+          mandar a mensagem agora (abre o composer no próprio lead) ou perder
+          mesmo assim. Sem botão "ok" neutro de propósito — a tela só existe
+          pra fazer a escolha aparecer. */}
+      {perdaSemContato && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+            <h3 className="text-base font-semibold text-neutral-900">
+              {perdaSemContato.leadName} nunca recebeu um contato
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-600">
+              Não há nenhuma mensagem nem mudança de contato registrada no histórico
+              deste lead. Movê-lo para{" "}
+              <span className="font-medium text-neutral-900">
+                {STATUS_LABELS[perdaSemContato.status]}
+              </span>{" "}
+              agora encerra o lead sem que tenha havido uma conversa.
+            </p>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-600">
+              Na base, 215 dos 487 leads perdidos saíram assim, e 201 deles vinham do
+              Trello, o canal que mais fecha.
+            </p>
+            <div className="mt-5 flex flex-col gap-2">
+              <button
+                onClick={() => {
+                  setComposerLeadId(perdaSemContato.leadId);
+                  setPerdaSemContato(null);
+                }}
+                className="w-full rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-neutral-800"
+              >
+                Mandar a primeira mensagem agora
+              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setPerdaSemContato(null)}
+                  className="flex-1 rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+                >
+                  Deixar como está
+                </button>
+                <button
+                  onClick={() => {
+                    const { leadId, status } = perdaSemContato;
+                    setPerdaSemContato(null);
+                    updateStatus(leadId, status, true);
+                  }}
+                  className="flex-1 rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+                >
+                  Perder mesmo assim
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {instagramComposerLead && (

@@ -10,7 +10,12 @@ import {
   STATUS_ORDER,
 } from "@/lib/types";
 import { syncLeadStatusToTrello } from "@/lib/trello";
-import { buildStatusChangeUpdate, FOLLOWUP_INTERVAL_HOURS } from "@/lib/lead-status";
+import {
+  buildStatusChangeUpdate,
+  FOLLOWUP_INTERVAL_HOURS,
+  LOSS_STATUSES,
+  nuncaFoiContatado,
+} from "@/lib/lead-status";
 
 /** Únicos valores de `source` que este PATCH aceita receber — hoje só o
  * botão "Enviar para Prospecção Ativa" da tela de Leads (ver
@@ -42,6 +47,7 @@ export async function PATCH(
     source,
     outreach_language,
     remarketing_stage,
+    confirmar_sem_contato,
   } = body as {
     status?: string;
     notes?: string;
@@ -53,6 +59,8 @@ export async function PATCH(
     source?: string;
     outreach_language?: "en" | "pt" | null;
     remarketing_stage?: RemarketingStage | null;
+    /** Ver a travessa de perda sem contato mais abaixo. */
+    confirmar_sem_contato?: boolean;
   };
 
   const update: {
@@ -148,6 +156,40 @@ export async function PATCH(
     .eq("id", id)
     .single();
 
+  /* Travessa: dar um lead como perdido sem nunca ter falado com ele.
+   *
+   * Medido em 17/11/2026: dos 487 leads perdidos da base, 215 (44%) não
+   * tinham nenhum contato registrado no histórico. 201 vinham do Trello (o
+   * único canal que já fechou contrato), todos tinham telefone e 164 foram
+   * pra "Finalizado" e não "Desqualificado" — tratados como "não fechou"
+   * sem nunca ter havido uma conversa pra não fechar.
+   *
+   * Não bloqueia, pede confirmação: perder sem contato é legítimo às vezes
+   * (telefone errado, negócio fechado, fora do perfil) e leads antigos
+   * podem ter sido trabalhados no Trello antes do CRM existir. O que não
+   * pode é acontecer em silêncio. Quem confirma manda
+   * `confirmar_sem_contato: true` e o motivo fica registrado no histórico.
+   *
+   * 409 (e não 400) porque o pedido está bem formado: é o estado do lead
+   * que conflita com a mudança pedida. */
+  const virandoPerda =
+    status !== undefined &&
+    before &&
+    LOSS_STATUSES.includes(status as LeadStatus) &&
+    !LOSS_STATUSES.includes(before.status as LeadStatus);
+
+  const perdaSemContato = Boolean(virandoPerda) && nuncaFoiContatado(before?.status_dates);
+
+  if (perdaSemContato && !confirmar_sem_contato) {
+    return NextResponse.json(
+      {
+        error: "Este lead nunca recebeu um contato registrado.",
+        code: "perda_sem_contato",
+      },
+      { status: 409 }
+    );
+  }
+
   // Se o status está mudando de verdade, registra a data dessa transição em
   // `status_dates` e (a não ser que o pedido já tenha informado
   // `next_followup` explicitamente) agenda/limpa o próximo follow-up
@@ -185,6 +227,14 @@ export async function PATCH(
         type: "status_change",
         message: `Status alterado de "${fromLabel}" para "${toLabel}"`,
       });
+
+      if (perdaSemContato) {
+        events.push({
+          lead_id: id,
+          type: "note",
+          message: `Dado como "${toLabel}" sem nenhum contato registrado no histórico (confirmado manualmente)`,
+        });
+      }
 
       if (next_followup === undefined && update.next_followup !== undefined) {
         events.push({
