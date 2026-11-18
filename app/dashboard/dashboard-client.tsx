@@ -2794,7 +2794,7 @@ export default function DashboardClient({
               agora encerra o lead sem que tenha havido uma conversa.
             </p>
             <p className="mt-2 text-sm leading-relaxed text-neutral-600">
-              Na base, 215 dos 487 leads perdidos saíram assim, e 201 deles vinham do
+              Na base, 97 dos 487 leads perdidos saíram assim, e 94 deles vinham do
               Trello, o canal que mais fecha.
             </p>
             <div className="mt-5 flex flex-col gap-2">

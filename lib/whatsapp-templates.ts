@@ -1324,6 +1324,17 @@ export const CONFIRMACAO_LABELS: string[] = WHATSAPP_TEMPLATES.filter((t) =>
   CONFIRMACAO_IDS.has(t.id)
 ).map((t) => t.label);
 
+/** Prefixo da `note` que o compositor grava ao preparar uma mensagem (ver
+ * logEvent em WhatsAppComposerModal).
+ *
+ * Exportado, e não escrito à mão nos dois lugares, porque quem consulta a
+ * timeline depende de casar exatamente com ele: a travessa de perda sem
+ * contato em app/api/leads/[id]/route.ts procura por esta frase pra saber se
+ * alguma mensagem já saiu. Uma cópia solta deixaria de casar sem erro
+ * nenhum, e o aviso voltaria a dizer "nunca recebeu contato" pra quem
+ * recebeu. */
+export const NOTA_MENSAGEM_PREPARADA = "Mensagem de WhatsApp preparada";
+
 /** A `note` gravada no envio cita o modelo entre aspas. Confere se a nota é
  * de um dos modelos de confirmação. */
 export function noteEhConfirmacao(message: string): boolean {

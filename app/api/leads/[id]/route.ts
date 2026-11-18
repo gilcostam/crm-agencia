@@ -10,6 +10,7 @@ import {
   STATUS_ORDER,
 } from "@/lib/types";
 import { syncLeadStatusToTrello } from "@/lib/trello";
+import { NOTA_MENSAGEM_PREPARADA } from "@/lib/whatsapp-templates";
 import {
   buildStatusChangeUpdate,
   FOLLOWUP_INTERVAL_HOURS,
@@ -25,6 +26,23 @@ import {
  * app/api/leads/route.ts: nenhum outro caminho pode forjar um `source`
  * arbitrário por aqui (ex.: "meta_ads", que dispara boas-vindas automática). */
 const ALLOWED_SOURCE_UPDATES = new Set(["prospeccao"]);
+
+/** Duas datas representam o mesmo instante?
+ *
+ * Comparar os textos não serve: o Postgres devolve
+ * `2026-11-17T12:00:00+00:00` e a tela manda `2026-11-17T12:00:00.000Z`, que
+ * é o mesmo momento escrito de dois jeitos. Com a comparação de texto, todo
+ * salvamento da ficha registrava um evento "Reunião agendada para ..." novo,
+ * mesmo sem ninguém ter mudado nada: o histórico de um lead de 17/11/2026
+ * tinha seis eventos idênticos para a mesma reunião. Histórico que repete
+ * deixa de ser histórico. */
+function mesmoInstante(a: string | null | undefined, b: string | null | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  const ta = Date.parse(a);
+  const tb = Date.parse(b);
+  return !Number.isNaN(ta) && !Number.isNaN(tb) && ta === tb;
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -161,11 +179,16 @@ export async function PATCH(
 
   /* Travessa: dar um lead como perdido sem nunca ter falado com ele.
    *
-   * Medido em 17/11/2026: dos 487 leads perdidos da base, 215 (44%) não
-   * tinham nenhum contato registrado no histórico. 201 vinham do Trello (o
-   * único canal que já fechou contrato), todos tinham telefone e 164 foram
-   * pra "Finalizado" e não "Desqualificado" — tratados como "não fechou"
-   * sem nunca ter havido uma conversa pra não fechar.
+   * Medido em 18/11/2026: dos 487 leads perdidos da base, 97 (20%) não têm
+   * nenhum toque registrado, nem em `status_dates` nem na timeline. 94
+   * vinham do Trello (o único canal que já fechou contrato) e 77 foram pra
+   * "Finalizado" e não "Desqualificado" — tratados como "não fechou" sem
+   * nunca ter havido uma conversa pra não fechar.
+   *
+   * A primeira medição deste comentário dizia 215, porque olhava só o
+   * `status_dates`. Os 118 de diferença tinham mensagem na timeline. O
+   * número menor é o certo, e é ele que justifica a travessa: 97 em 487
+   * ainda é um em cada cinco.
    *
    * Não bloqueia, pede confirmação: perder sem contato é legítimo às vezes
    * (telefone errado, negócio fechado, fora do perfil) e leads antigos
@@ -181,7 +204,30 @@ export async function PATCH(
     LOSS_STATUSES.includes(status as LeadStatus) &&
     !LOSS_STATUSES.includes(before.status as LeadStatus);
 
-  const perdaSemContato = Boolean(virandoPerda) && nuncaFoiContatado(before?.status_dates);
+  /* Segunda fonte de prova de contato: a timeline.
+   *
+   * `status_dates` só é escrito quando o status muda, então ele não vê duas
+   * coisas que de fato aconteceram: a mensagem inicial automática dos leads
+   * vindos do Trello (gravada como `whatsapp_sent`) e a mensagem preparada
+   * no compositor sem mudança de status (gravada como `note`). Medido em
+   * 18/11/2026: dos 215 perdidos sem prova em `status_dates`, 118 tinham uma
+   * dessas duas marcas. Sem nenhum toque mesmo eram 97.
+   *
+   * A consulta só roda quando o lead está virando perda, então o PATCH
+   * normal continua com uma ida ao banco. */
+  let houveMensagem = false;
+  if (virandoPerda) {
+    const { data: toques } = await supabase
+      .from("lead_events")
+      .select("id")
+      .eq("lead_id", id)
+      .or(`type.eq.whatsapp_sent,message.ilike.*${NOTA_MENSAGEM_PREPARADA}*`)
+      .limit(1);
+    houveMensagem = (toques?.length ?? 0) > 0;
+  }
+
+  const perdaSemContato =
+    Boolean(virandoPerda) && nuncaFoiContatado(before?.status_dates, houveMensagem);
 
   if (perdaSemContato && !confirmar_sem_contato) {
     return NextResponse.json(
@@ -338,7 +384,7 @@ export async function PATCH(
       });
     }
 
-    if (meeting_datetime !== undefined && before.meeting_datetime !== meeting_datetime) {
+    if (meeting_datetime !== undefined && !mesmoInstante(before.meeting_datetime, meeting_datetime)) {
       events.push({
         lead_id: id,
         type: "meeting",

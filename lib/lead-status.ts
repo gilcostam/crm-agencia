@@ -128,15 +128,30 @@ export const CONTACT_PROOF_STATUSES: LeadStatus[] = [
 /** Status de perda: o lead sai do funil sem ter fechado. */
 export const LOSS_STATUSES: LeadStatus[] = ["finalizado", "desqualificado"];
 
-/** `true` quando o histórico do lead não tem nenhuma prova de contato (ver
- * CONTACT_PROOF_STATUSES). Usado pra pedir confirmação antes de dar o lead
- * como perdido, e pra montar a fila do dia.
+/** `true` quando o histórico do lead não tem nenhuma prova de contato.
+ * Usado pra pedir confirmação antes de dar o lead como perdido, e pra montar
+ * a fila do dia.
+ *
+ * Duas fontes de prova, e as duas são necessárias:
+ *
+ * 1. `status_dates` (ver CONTACT_PROOF_STATUSES), que só é escrito quando o
+ *    status muda.
+ * 2. `houveMensagem`, que o chamador apura na timeline (`lead_events`).
+ *
+ * A segunda existe porque a primeira sozinha mentia. Medido em 18/11/2026:
+ * dos 487 leads perdidos, 215 não tinham prova em `status_dates`, mas 41
+ * deles tinham recebido a mensagem automática inicial do Trello e 100
+ * tinham nota do compositor, ou seja, alguém abriu o WhatsApp com a
+ * mensagem pronta. Sem nenhum toque mesmo: 97, e não 215. Olhar só o
+ * `status_dates` fazia o aviso gritar em lead já contatado, que é o jeito
+ * mais rápido de ensinar a usuária a ignorar o aviso.
  *
  * Importante: "nunca contatado" aqui é sempre uma afirmação sobre o que o
  * CRM registrou, não sobre o mundo. Leads muito antigos podem ter sido
  * trabalhados por fora (o Trello era o quadro real) e chegado aqui já com o
  * estado final — por isso a travessa pede confirmação em vez de bloquear. */
-export function nuncaFoiContatado(statusDates: unknown): boolean {
+export function nuncaFoiContatado(statusDates: unknown, houveMensagem = false): boolean {
+  if (houveMensagem) return false;
   const sd = normalizeStatusDates(statusDates);
   return !CONTACT_PROOF_STATUSES.some((s) => sd[s]);
 }

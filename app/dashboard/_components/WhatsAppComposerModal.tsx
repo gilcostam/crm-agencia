@@ -9,6 +9,7 @@ import {
   WhatsappLanguage,
   buildTemplateVars,
   defaultTemplateIdForStatus,
+  NOTA_MENSAGEM_PREPARADA,
   fieldLabel,
   getTemplate,
   getTemplatesForChannel,
@@ -373,7 +374,7 @@ export default function WhatsAppComposerModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "note",
-          message: `Mensagem de WhatsApp preparada (modelo "${template.label}"): "${finalText.slice(0, 200)}${
+          message: `${NOTA_MENSAGEM_PREPARADA} (modelo "${template.label}"): "${finalText.slice(0, 200)}${
             finalText.length > 200 ? "…" : ""
           }"`,
         }),
